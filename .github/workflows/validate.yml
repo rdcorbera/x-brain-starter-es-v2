@@ -1,0 +1,43 @@
+name: validar cerebro
+
+# El pre-commit valida lo que cambia; esto valida el bundle completo, que es
+# donde se ven los índices y derivados desincronizados. Sin `pip install`:
+# la capa determinista es stdlib pura a propósito.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"   # el mismo piso que el Python de fábrica de macOS
+
+      - name: Artefactos generados al día
+        run: |
+          python3 kernel/bin/brain.py generate
+          git diff --exit-code -- kernel/schema .claude .github/prompts \
+            || { echo "::error::Hay artefactos generados desactualizados. Corre 'brain.py generate' y commitea."; exit 1; }
+
+      - name: Round-trip -- generador y validador se comprueban entre sí
+        run: python3 kernel/tests/test_roundtrip.py
+
+      - name: Validar el bundle
+        run: |
+          if [ ! -d cerebro ]; then
+            echo "::notice::Sin cerebro/ en este repositorio (es un starter). Se omite."
+            exit 0
+          fi
+          python3 kernel/bin/brain.py validate cerebro
+
+      - name: Postura de gobierno de datos
+        if: always()
+        run: |
+          [ -d cerebro ] && python3 kernel/bin/brain.py govern cerebro || true

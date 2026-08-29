@@ -2,64 +2,84 @@
 
 ## Qué es este repositorio
 
-El **starter en construcción** de X-Brain v2. Ojo con la distinción, porque cambia todo lo que hagas aquí:
+El **starter en construcción** de X-Brain v2. Dos distinciones que cambian todo lo que hagas aquí:
 
-- Hoy estamos **construyendo el sistema**: escribimos el kernel, los skills, el esquema y la documentación.
-- No estamos **operando un cerebro**: no hay conocimiento de nadie que ingerir, ni inbox que procesar.
+- Estamos **construyendo el sistema**, no operando un cerebro. Aquí se escribe el kernel; el conocimiento vive en el repositorio de cada usuario.
+- **Este starter nunca contiene conocimiento.** Un `raw/` o un `inbox/` vacíos son lo esperado, no un síntoma. No saques conclusiones de adopción a partir de este repo ni de los starters anteriores.
 
-Cuando el starter esté listo, este mismo archivo pasará a ser el que cargue el sistema en la sesión del usuario final. Mientras tanto, es la guía de trabajo del proyecto.
+**v1 está en producción, en un entorno bancario, con más de 10.000 documentos.** El incentivo del rediseño es que el consumo de tokens crece con el cerebro. Todo lo que se construya aquí se juzga contra esa pendiente.
 
 ## Referencia: la v1
 
-La versión anterior está clonada localmente en `../x-brain-starter-es` (kernel 1.3.0) y publicada en https://github.com/rdcorbera/x-brain-starter-es. **Consúltala antes de rediseñar algo**: `kernel/AGENTS.md` (reglas y zonas), `kernel/GUIA-DE-USO.md` (operación completa), `kernel/esquema/okf.md` (formato), `kernel/CHANGELOG.md` (qué se aprendió en cada versión) y `kernel/modulos/` (la lógica de los 15 skills).
+Clonada en `../x-brain-starter-es` (**kernel 1.4.0**), publicada en https://github.com/rdcorbera/x-brain-starter-es. **Consúltala antes de rediseñar algo**: `kernel/AGENTS.md`, `kernel/GUIA-DE-USO.md`, `kernel/esquema/okf.md`, `kernel/CHANGELOG.md`, `kernel/modulos/`. Sus 11 plantillas son la especificación de facto de la que salió el contrato de v2.
 
-Es referencia, no destino: v2 se rehace desde cero. Reutiliza lo que probó funcionar, no lo que simplemente estaba ahí.
+**v1 sigue avanzando mientras construimos v2.** La 1.4.0 llegó a mitad de trabajo y trajo el tipo `Plan`. **Revisa `kernel/CHANGELOG.md` de v1 al empezar cada tramo** — sobre todo antes del paso 7, donde se escribe prosa contra un sistema que puede haber cambiado.
+
+Es referencia, no destino. Reutiliza lo que probó funcionar, no lo que simplemente estaba ahí.
 
 ## Reglas de trabajo
 
-1. **Español** en todo: documentación, nombres de archivo, mensajes de commit, conversación.
-2. **README.md y CLAUDE.md se mantienen vivos.** Cuando se cierre una decisión de diseño o se agregue una pieza, actualizar el archivo que corresponda en el mismo turno — no dejarlo para después. La bitácora de abajo es parte de esto.
-3. **No inventar.** Si falta un dato para decidir, se pregunta o se anota en «Preguntas abiertas». Nunca rellenar un hueco con un supuesto sin marcarlo.
-4. **Decisión antes que código.** Antes de escribir una pieza nueva del sistema, dejar registrado en la bitácora qué se decidió y por qué. Las alternativas descartadas valen tanto como la elegida.
-5. **Mostrar antes de escribir** cuando el cambio sea grande o toque archivos ya acordados.
-6. **Sin commits automáticos.** Se hace commit cuando el usuario lo pida.
+1. **Español** en documentación, contenido y conversación. **Inglés** en código y archivos de configuración (`.json`, `.yml`): identificadores, claves, comentarios y nombres de subcomando. No traducir código al español.
+2. **La documentación se mantiene viva.** Al cerrar una decisión: la entrada va a [`tmp/BITACORA.md`](tmp/BITACORA.md); al avanzar un paso o cambiar el alcance: [`tmp/PLAN.md`](tmp/PLAN.md); al agregar una pieza visible: `README.md`. Todo en el mismo turno, nunca «para después».
+3. **No inventar.** Si falta un dato, se pregunta o se anota en «Preguntas abiertas».
+4. **Decisión antes que código.** Registrar en la bitácora qué se decidió y por qué. Las alternativas descartadas valen tanto como la elegida.
+5. **La prosa se escribe al final.** Solo se puede borrar una regla cuando ya existe el código que la sustituye. Escribirla primero fue el error de v1: la prosa se volvió portante.
+6. **Mostrar antes de escribir** cuando el cambio sea grande o toque archivos ya acordados.
+7. **Sin commits automáticos.** Se hace commit cuando el usuario lo pida.
+
+## Invariantes de la capa determinista
+
+No negociables. Si un cambio los rompe, el cambio está mal.
+
+1. **Nunca llama a un LLM.** Por eso puede correr en CI, en un hook, o cien veces seguidas.
+2. **Cero dependencias.** Stdlib pura, Python 3.9+ (el de fábrica de macOS). En un entorno bancario con `pip` restringido esto no es una preferencia, es el requisito de que el sistema funcione. El conversor de binarios y la proyección DuckDB son capas opcionales.
+3. **Idempotente.** `generate` dos veces produce el mismo árbol. Los derivados se comparan por **cuerpo**, no por archivo completo: su frontmatter lleva un timestamp de generación.
+4. **`--fix` solo hace cambios que preservan el significado**, y lo verifica en vez de asumirlo. Índices y derivados se regeneran; el frontmatter solo se entrecomilla, reparseando cada línea antes de escribirla. Nunca reescribe lo que una persona redactó.
+5. **Un artefacto generado no se edita.** Se edita `kernel/schema/contract.json` y se regenera.
 
 ## Convenciones
 
-- Archivos y carpetas en **kebab-case**, descriptivos y autocontenidos.
-- Documentación en markdown; **diagramas siempre como texto** (Mermaid preferido), nunca solo imágenes.
-- Nada de credenciales, secretos ni datos personales de terceros en el repo — tampoco en ejemplos.
-- Los ejemplos que ilustren el sistema usan datos ficticios y se marcan como tales.
+- Archivos y carpetas en **kebab-case**. Los valores de `type` conservan los que producción ya usa (`Reunion`, `Pregunta`…): cambiarlos sería migrar todos los cerebros.
+- **Diagramas siempre como texto** (Mermaid), nunca solo imágenes.
+- Nada de credenciales, secretos ni datos de terceros — tampoco en ejemplos. Los ejemplos usan datos ficticios y se marcan como tales.
 
-## Estado del diseño
+## Contexto del rediseño
 
-**Definido:** la herencia conceptual del README (PARA, OKF, LLM Wiki, raw inmutable, zonas de propiedad, cerebro portable, nunca fabricar), el modelo de distribución (repo template) y las herramientas soportadas (Claude Code + Copilot).
+Todo el contexto para continuar vive en `tmp/`. **Léelo antes de retomar el trabajo**
+— no reabras decisiones ya cerradas sin consultar la bitácora.
 
-**Por decidir:** estructura de carpetas, catálogo de tipos, inventario de skills, mecánica de ingesta de binarios, estrategia de recuperado a escala y validación determinista.
+> **`tmp/` está en `.gitignore`**: es local a esta máquina y no se versiona, porque son notas
+> del rediseño y no parte del starter que los usuarios clonan. En un clon estos archivos **no
+> existen** — si trabajas desde otro sitio, pídelos. Y no hay historial: respáldalos aparte.
 
-## Bitácora de decisiones
+| Archivo | Qué es | Cuándo leerlo |
+|---|---|---|
+| [tmp/PLAN.md](tmp/PLAN.md) | **El plan vigente.** Diagnóstico de las dos pendientes, los 10 pasos con su estado, riesgos y preguntas abiertas | Siempre, al retomar. Si algo lo contradice, manda este |
+| [tmp/BITACORA.md](tmp/BITACORA.md) | 22 decisiones cerradas con su razón y lo que se descartó | Antes de reabrir cualquier decisión de diseño |
+| [tmp/plan-implementacion-x-brain-v2.md](tmp/plan-implementacion-x-brain-v2.md) | Propuesta del equipo. **Insumo, no plan** — evaluada y adoptada en parte | Al retomar DuckDB, hechos atómicos o capa semántica (cortes 2–3) |
+| [tmp/rediseño second brain primera investigacion.md](tmp/rediseño%20second%20brain%20primera%20investigacion.md) | Investigación: búsqueda agéntica, grafos ligeros, OKF v0.2, progressive disclosure | Al evaluar recuperación a escala |
+| [tmp/rediseño second brain segunda investigacion.md](tmp/rediseño%20second%20brain%20segunda%20investigacion.md) | Investigación: paradigmas alternativos y veredicto sobre Markdown-en-Git como fuente de verdad | Antes de reconsiderar la fuente de verdad |
 
-Una entrada por decisión cerrada: fecha, qué se decidió, por qué, qué se descartó.
+### Cómo retomar
 
-### 2026-08-26 — Soporte de primera clase para Claude Code y Copilot
+1. **Lee [tmp/PLAN.md](tmp/PLAN.md)** — la tabla de pasos dice qué está hecho y qué no.
+2. **Comprueba que todo sigue en verde** antes de tocar nada:
+   ```bash
+   python3 kernel/tests/test_roundtrip.py     # contrato consistente consigo mismo
+   python3 kernel/bin/brain.py generate       # los artefactos generados, al día
+   ```
+3. **Revisa `kernel/CHANGELOG.md` de v1** — avanza mientras construimos; la 1.4.0 llegó a
+   mitad de sesión y trajo un tipo nuevo.
 
-v2 sigue sirviendo a las dos herramientas, como v1. Se descartó apuntar solo a Claude Code (habría dado acceso a hooks, subagentes y plugins sin denominador común, pero deja fuera a los usuarios de Copilot) y también posponer Copilot para después.
+**Lo que bloquea todo lo demás:** el paso 0 no está cerrado. Correr `survey.py` sobre el
+cerebro real decide si la prosa del kernel (paso 7) se escribe sobre este sistema o sobre uno
+con la proyección DuckDB adelantada. Escribirla antes es apostar a que el diagnóstico acierta.
 
-**Consecuencia de diseño:** la lógica del sistema vive en markdown neutro, invocable desde ambas. Ninguna capacidad esencial puede depender de una herramienta sola; lo específico de cada una queda como capa fina de invocación. Los stubs duplicados se quedan — lo que hay que eliminar es mantenerlos a mano.
-
-### 2026-08-26 — Distribución como repo template, igual que v1
-
-El sistema viaja dentro del repositorio del usuario y se actualiza con merge desde upstream. Se descartó distribuir el kernel como plugin de Claude Code (habría sacado el kernel del repo del usuario y eliminado el merge, pero es incompatible con soportar Copilot) y también el híbrido.
-
-**Consecuencia de diseño:** nada impide editar el kernel, así que la separación sistema/conocimiento hay que sostenerla por convención, documentación y validación propia. Es una de las mejoras pendientes del README.
-
-### 2026-08-26 — Rehacer desde cero en vez de evolucionar el kernel 1.3.0
-
-v1 acumuló fricciones estructurales (cumplimiento de las zonas, stubs duplicados, validación no determinista) que no se arreglan con una versión más del kernel. Se descartó seguir el changelog de v1 con una 1.4.0. Se conserva la herencia conceptual, no el código.
+Segundo pendiente del paso 0: revisar las competency questions, todavía en borrador.
 
 ## Preguntas abiertas
 
-- ¿Qué mecanismo hace cumplir la separación sistema/conocimiento, dado que el kernel vive dentro del repo del usuario?
-- ¿Cómo se generan y mantienen sincronizados los stubs de las dos herramientas desde una sola fuente?
-- ¿Hay ruta de migración desde un cerebro v1, o v2 arranca limpio?
-- ¿Cómo se llama el producto y el repo definitivo?
+Viven en [tmp/PLAN.md](tmp/PLAN.md), junto a los riesgos. Las que bloquean trabajo hoy:
+la **taxonomía de clasificación** es una propuesta nuestra y conviene validarla con
+gobierno de datos **antes** de migrar el corpus; y `governance.steward` sigue en TODO —
+un artefacto gobernado sin dueño no está gobernado.

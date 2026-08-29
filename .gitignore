@@ -1,0 +1,17 @@
+# Entorno de las capas opcionales (conversor de insumos, proyección DuckDB).
+# La capa determinista de kernel/bin/ no necesita ninguno: es stdlib pura.
+.venv/
+__pycache__/
+*.pyc
+
+# Proyección DuckDB (corte 2): derivada y reconstruible, nunca se versiona.
+_db/
+*.duckdb
+
+# Ruido del sistema
+.DS_Store
+
+# Contexto del rediseño: notas de trabajo, no parte del starter que se clona.
+# Local a esta máquina — no se versiona, así que no hay historial de PLAN.md
+# ni de BITACORA.md. Respáldalos aparte si importan.
+tmp/
