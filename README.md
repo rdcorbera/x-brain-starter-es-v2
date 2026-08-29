@@ -42,7 +42,7 @@ De ahí el orden del trabajo: **el contrato primero, porque es la dependencia bl
 Sobre eso, v2 añade una capa determinista con dos invariantes:
 
 1. **Nunca llama a un LLM.** La extracción ocurre una vez, en la ingesta, con revisión humana. La validación, la generación y (en el corte 2) la proyección ocurren cuantas veces se quiera, gratis, y son reconstruibles.
-2. **No tiene dependencias.** Stdlib pura, Python 3.9+ — corre con el intérprete de fábrica de macOS, sin `pip install`, en entornos restringidos. El conversor de binarios y la proyección DuckDB son capas opcionales; esto no.
+2. **No tiene dependencias.** Stdlib pura, Python 3.11+, sin `pip install`, en entornos restringidos. El piso lo fija lo que el código necesita —parseo ISO 8601 completo para `stale_after`— y no el intérprete que traiga el sistema; 3.9 y 3.10 además están fuera de soporte. `survey.py`, que es el preflight, se queda en 3.9 a propósito. El conversor de binarios y la proyección DuckDB son capas opcionales; esto no.
 
 ```
 kernel/schema/contract.json      ← EL CONTRATO. Fuente única.
