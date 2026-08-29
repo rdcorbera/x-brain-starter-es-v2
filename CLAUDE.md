@@ -32,7 +32,7 @@ Es referencia, no destino. Reutiliza lo que probó funcionar, no lo que simpleme
 No negociables. Si un cambio los rompe, el cambio está mal.
 
 1. **Nunca llama a un LLM.** Por eso puede correr en CI, en un hook, o cien veces seguidas.
-2. **Cero dependencias.** Stdlib pura, Python 3.9+ (el de fábrica de macOS). En un entorno bancario con `pip` restringido esto no es una preferencia, es el requisito de que el sistema funcione. El conversor de binarios y la proyección DuckDB son capas opcionales.
+2. **Cero dependencias.** Stdlib pura, **Python 3.11+**. En un entorno bancario con `pip` restringido esto no es una preferencia, es el requisito de que el sistema funcione. El piso lo fijan los requisitos, no el intérprete de fábrica de una máquina: 3.11 es la versión mínima que parsea un instante ISO 8601 completo (`stale_after`), y 3.9/3.10 están fuera de soporte. Excepción deliberada: **`survey.py` se queda en 3.9**, porque es el preflight y corre antes de que se instale nada. El conversor de binarios y la proyección DuckDB son capas opcionales.
 3. **Idempotente.** `generate` dos veces produce el mismo árbol. Los derivados se comparan por **cuerpo**, no por archivo completo: su frontmatter lleva un timestamp de generación.
 4. **`--fix` solo hace cambios que preservan el significado**, y lo verifica en vez de asumirlo. Índices y derivados se regeneran; el frontmatter solo se entrecomilla, reparseando cada línea antes de escribirla. Nunca reescribe lo que una persona redactó.
 5. **Un artefacto generado no se edita.** Se edita `kernel/schema/contract.json` y se regenera.

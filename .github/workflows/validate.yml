@@ -12,22 +12,44 @@ on:
 
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    # Windows además de Linux: el entorno donde esto va a correr es solo
+    # Windows, y ahí los finales de línea y el intérprete se comportan distinto.
+    # Un fallo que solo aparece en el banco no sirve de nada.
+    # Piso y techo, en los dos sistemas: 3.11 es lo mínimo que el código
+    # tolera, 3.14 es lo que conviene instalar. Probar solo uno deja que el
+    # código se pudra por arriba o suba el piso sin querer por abajo.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.11", "3.14"]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash   # Git Bash en Windows: un solo dialecto de script para ambos
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.9"   # el mismo piso que el Python de fábrica de macOS
+          python-version: ${{ matrix.python-version }}
 
+      # `python`, no `python3`: es el único nombre que setup-python garantiza
+      # en las tres plataformas. En Windows `python3` puede no existir o caer
+      # en el stub de Microsoft Store.
       - name: Artefactos generados al día
         run: |
-          python3 kernel/bin/brain.py generate
+          python kernel/bin/brain.py generate
           git diff --exit-code -- kernel/schema .claude .github/prompts \
             || { echo "::error::Hay artefactos generados desactualizados. Corre 'brain.py generate' y commitea."; exit 1; }
 
       - name: Round-trip -- generador y validador se comprueban entre sí
-        run: python3 kernel/tests/test_roundtrip.py
+        run: python kernel/tests/test_roundtrip.py
+
+      # survey.py es el preflight y su piso es 3.9, no 3.11: si alguien le
+      # cuela sintaxis moderna, deja de correr donde tiene que correr.
+      - name: survey.py sigue compilando contra su propio piso (3.9)
+        run: python -c "import ast,pathlib; ast.parse(pathlib.Path('kernel/bin/survey.py').read_text(encoding='utf-8'), feature_version=(3,9))"
 
       - name: Validar el bundle
         run: |
@@ -35,9 +57,9 @@ jobs:
             echo "::notice::Sin cerebro/ en este repositorio (es un starter). Se omite."
             exit 0
           fi
-          python3 kernel/bin/brain.py validate cerebro
+          python kernel/bin/brain.py validate cerebro
 
       - name: Postura de gobierno de datos
         if: always()
         run: |
-          [ -d cerebro ] && python3 kernel/bin/brain.py govern cerebro || true
+          [ -d cerebro ] && python kernel/bin/brain.py govern cerebro || true

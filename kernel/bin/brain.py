@@ -9,7 +9,7 @@ Two invariants govern this file:
 
   1. It NEVER calls an LLM. Everything here is deterministic and idempotent,
      so it can run in CI, on a hook, or a hundred times in a row.
-  2. It has NO dependencies. Standard library only, Python 3.9+, so it runs
+  2. It has NO dependencies. Standard library only, Python 3.11+, so it runs
      with a stock interpreter in a locked-down environment. The binary
      converter and the DuckDB projection are optional layers; this is not.
 
@@ -33,6 +33,16 @@ from collections import Counter, defaultdict
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
+
+# Fails loudly rather than degrading quietly: below 3.11 `fromisoformat`
+# rejects the `Z` suffix, `parse_instant` would return None for a perfectly
+# valid instant, and V15 would skip every stale document without saying so.
+if sys.version_info < (3, 11):
+    raise SystemExit(
+        "error: brain.py necesita Python 3.11+ (este intérprete es "
+        f"{sys.version_info.major}.{sys.version_info.minor}).\n"
+        "       3.11 trae el parseo ISO 8601 completo que exige `stale_after`;\n"
+        "       por debajo, la caducidad se evaluaría mal en silencio.")
 
 VERSION = "2.0.0-dev"
 
@@ -704,6 +714,26 @@ def _check_map(name: str, value: Any, spec: Dict[str, Any],
     return problems
 
 
+def parse_instant(raw: str) -> Optional[datetime]:
+    """Parse an OKF instant into an aware datetime. None if it is not one.
+
+    OKF v0.2 says `stale_after` is a full ISO 8601 instant, zone included.
+    `fromisoformat` only learned to read the `Z` suffix -- the ordinary way to
+    write UTC -- in 3.11, and that is one of the two reasons the floor is 3.11:
+    the alternative was hand-rolling an ISO parser or truncating to the date,
+    and truncating silently threw away the hour and the zone.
+
+    A brain migrated from v1 still carries plain dates in that field, so a
+    value with no zone is anchored to the local one rather than rejected.
+    Everything comes back aware: comparing aware to naive raises TypeError.
+    """
+    try:
+        when = datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+    return when if when.tzinfo else when.astimezone()
+
+
 # ============================================================================
 # Validation
 # ============================================================================
@@ -1015,7 +1045,7 @@ class Validator:
                 self.add("V12", rel, "index.md desactualizado (auto-arreglable con --fix)")
 
     def check_derived(self) -> None:
-        now = datetime.now()
+        now = datetime.now().astimezone()   # aware: stale_after lleva zona
         for name, body in build_derived(self.contract, self.docs).items():
             path = self.bundle / name
             if not path.exists():
@@ -1028,13 +1058,12 @@ class Validator:
             if not isinstance(stale, str):
                 continue
             status = doc.meta.get("status", "stable")
-            try:
-                when = datetime.strptime(stale[:10], "%Y-%m-%d")
-            except ValueError:
+            when = parse_instant(stale)
+            if when is None:
                 continue
             if when < now and status == "stable":
                 self.add("V15", doc.rel,
-                         f"stale_after venció el {stale[:10]} y sigue en status stable",
+                         f"stale_after venció el {stale} y sigue en status stable",
                          severity=WARNING)
 
 
@@ -1516,19 +1545,56 @@ def report(findings: List[Finding], bundle: Path, full: bool) -> None:
 # Commands
 # ============================================================================
 
+def write_text_lf(path: Path, content: str) -> None:
+    """Write LF, never the platform's line ending.
+
+    Left to itself `write_text` translates \n to os.linesep, so on Windows
+    every generated artifact comes out CRLF: the whole file reads as modified
+    in the diff and CI's `generate` + `git diff --exit-code` fails on a tree
+    nobody touched. Named rather than inlined so there is one place to look,
+    not so callers have to remember an argument.
+    """
+    path.write_text(content, encoding="utf-8", newline="\n")
+
+
 def write_if_changed(path: Path, content: str) -> bool:
-    if path.exists() and path.read_text(encoding="utf-8") == content:
-        return False
+    # Compare RAW -- newlines included. A normalising read reports a CRLF file
+    # as already up to date, so it would stay CRLF forever. The validator does
+    # normalise: it judges content, this judges bytes on disk.
+    #
+    # This one has to go through open(): `read_text` gained `newline` in 3.13
+    # and the floor is 3.11. Collapse it into `read_text` if the floor moves.
+    if path.exists():
+        with open(path, "r", encoding="utf-8", newline="") as fh:
+            if fh.read() == content:
+                return False
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
+    write_text_lf(path, content)
     return True
 
 
-PRE_COMMIT = """#!/bin/sh
-# Installed by `brain.py hooks --install`. Validates only what is being committed:
-# a hook that fails on the inherited corpus gets disabled on day one.
-exec python3 kernel/bin/brain.py validate --staged
-"""
+# Identifies a hook as ours across installs: the interpreter path is resolved
+# at install time, so the script text differs from machine to machine.
+PRE_COMMIT_MARKER = "brain.py validate --staged"
+
+
+def pre_commit_script() -> str:
+    """The hook Git runs, with the interpreter resolved at install time.
+
+    `python3` is not a safe assumption on Windows: the launcher is `py`, and a
+    bare `python3` can reach the Microsoft Store stub instead of an
+    interpreter. `sys.executable` is whatever ran the install; `as_posix`
+    keeps Git for Windows's sh from reading a Windows path's backslashes as
+    escapes,
+    and the quotes survive a path with spaces (`C:/Program Files/...`).
+    """
+    return (
+        "#!/bin/sh\n"
+        "# Installed by `brain.py hooks --install`. Validates only what is being\n"
+        "# committed: a hook that fails on the inherited corpus gets disabled on\n"
+        "# day one.\n"
+        f'exec "{Path(sys.executable).as_posix()}" kernel/bin/brain.py validate --staged\n'
+    )
 
 
 def staged_paths(bundle: Path) -> set:
@@ -1813,7 +1879,7 @@ def fix_yaml_hazards(doc: Document) -> bool:
         fixed = True
 
     if fixed:
-        doc.path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        write_text_lf(doc.path, "\n".join(lines) + "\n")
     return fixed
 
 
@@ -1878,11 +1944,12 @@ def cmd_hooks(args) -> int:
         state = "instalado" if hook.exists() else "no instalado"
         print(f"pre-commit: {state}")
         return 0
-    if hook.exists() and PRE_COMMIT not in hook.read_text(encoding="utf-8"):
+    if hook.exists() and PRE_COMMIT_MARKER not in hook.read_text(encoding="utf-8"):
         raise SystemExit(
             "error: ya existe un pre-commit distinto. Revísalo y compón a mano;\n"
             "       sobrescribir el hook de alguien más no es cosa de esta herramienta.")
-    hook.write_text(PRE_COMMIT, encoding="utf-8")
+    # LF without exception: sh fails on a CRLF shebang (`bad interpreter`).
+    write_text_lf(hook, pre_commit_script())
     hook.chmod(0o755)
     print(f"instalado {hook} -- valida solo lo que se commitea")
     return 0

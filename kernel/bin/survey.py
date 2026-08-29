@@ -5,7 +5,10 @@ Measures where tokens go as a brain grows. Reports shapes and counts only --
 never document content -- so the output is safe to share from a restricted
 environment.
 
-Stdlib only. No writes. No network. Python 3.9+.
+Stdlib only. No writes. No network. Python 3.9+ -- deliberately lower than
+brain.py's 3.11 floor. This is the preflight: it runs on the target machine
+BEFORE anything is installed, to find out what is there. A preflight that
+depends on its own findings is no preflight.
 
 Usage:
     python3 kernel/bin/survey.py [BUNDLE] [--touched N] [--json]

@@ -1,0 +1,24 @@
+# Finales de línea LF en el árbol de trabajo, también en Windows.
+#
+# Sin esto, un clon en Windows deja CRLF en disco: `brain.py generate` reescribe
+# cada artefacto y todos aparecen enteros modificados en el diff, aunque nadie
+# los haya tocado. La otra mitad de la defensa está en `write_text_lf`, que
+# escribe LF siempre; esta es la que impide que el checkout los vuelva a CRLF.
+* text=auto eol=lf
+
+# Explícito para lo que compone el kernel y el cerebro.
+*.md    text eol=lf
+*.py    text eol=lf
+*.json  text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+
+# Los originales que se archivan en raw/ nunca se normalizan.
+*.pdf   binary
+*.docx  binary
+*.xlsx  binary
+*.pptx  binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.zip   binary
