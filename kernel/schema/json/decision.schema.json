@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "decision.schema.json",
+  "title": "Decision",
+  "description": "Record of a decision with its context, alternatives and consequences",
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "classification": {
+      "type": "string",
+      "enum": [
+        "public",
+        "internal",
+        "confidential",
+        "restricted"
+      ]
+    },
+    "generated": {
+      "type": "object",
+      "properties": {
+        "by": {
+          "type": "string"
+        },
+        "at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "by",
+        "at"
+      ]
+    },
+    "verified": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "stable",
+        "deprecated"
+      ]
+    },
+    "stale_after": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "proyecto": {
+      "type": "string"
+    },
+    "estado": {
+      "type": "string",
+      "enum": [
+        "propuesta",
+        "aceptada",
+        "reemplazada",
+        "obsoleta"
+      ]
+    },
+    "fecha": {
+      "type": "string",
+      "format": "date"
+    },
+    "decisores": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "reemplazada_por": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "type",
+    "title",
+    "description",
+    "tags",
+    "classification",
+    "generated",
+    "proyecto",
+    "estado",
+    "fecha"
+  ]
+}

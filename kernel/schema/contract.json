@@ -1,0 +1,554 @@
+{
+  "note": "Single source of truth for this brain's data contract. Templates, JSON Schemas, the catalog, the portable bundle schema, the skill stubs, the directory indexes, the derived indexes and (in cut 2) the DuckDB DDL are all GENERATED from this file. Never edit a generated artifact; edit this and run `brain generate`. READING ORDER -- the top-level keys are ordered as a narrative, separated by blank lines, rather than nested into groups: (1) what this contract is -- note, versions, provenance, governance, and the policies it is written under; (2) the vocabulary the schema is written in -- data types, actors, and the classification ladder, each defined before it is used; (3) the schema itself -- common_fields and types, which are 59% of the file; (4) the files it produces -- reserved, exempt, derived, and the portable bundle schema. Grouping these into nested objects was considered and rejected: the groups are wildly uneven, the boundaries are genuinely ambiguous (classification is both vocabulary and policy), and nesting would lengthen every access path and every provenance entry for no functional gain.",
+  "okf_version": "0.2",
+  "profile_version": 1,
+
+  "provenance": {
+    "note": "What comes from the OKF specification and what is ours. This block exists because the file used to be named okf.json, which implied the whole thing was the standard -- it is not, and the confusion had a cost: it was unclear what to update when a new OKF version ships. The answer is now exact: the items under `from_okf`, and nothing else.",
+    "okf_version": "0.2",
+    "okf_spec": "https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md",
+    "from_okf": [
+      "actors",
+      "reserved_files",
+      "common_fields.type",
+      "common_fields.title",
+      "common_fields.description",
+      "common_fields.tags",
+      "common_fields.generated",
+      "common_fields.verified",
+      "common_fields.sources",
+      "common_fields.status",
+      "common_fields.stale_after"
+    ],
+    "from_v1": ["common_fields.timestamp"],
+    "from_x_brain": ["common_fields.classification"],
+    "ours": "Everything not listed above. OKF leaves `type` producer-defined and takes no position on a field-level type system, data classification, stewardship, derived files, severity policy or generation -- which is most of this file by volume. Our additions extend the standard; they never contradict it, and the validator keeps the two levels apart so a bundle stays OKF-conformant even when it fails our profile.",
+    "completeness_rule": "Every entry of `common_fields` must appear in exactly one of the three lists. A new common field therefore forces a conscious answer to 'is this the standard's or ours?', which is the question the old filename made impossible to answer. Enforced by kernel/tests/test_roundtrip.py."
+  },
+  "governance": {
+    "note": "Makes this contract a governed artifact rather than a file someone edits. Governance that lives only in prose is what v1 had, and it enforced nothing.",
+    "steward": "<TODO: /x-setup -- who answers for this contract>",
+    "change_process": "A contract change is a PR to the starter, never a local edit. Bump `profile_version` when tightening a constraint. No type enters without a competency question that needs it.",
+    "review_cadence": "Once per planning period, alongside /x-cierre-periodo.",
+    "enforcement": "`brain.py validate` on pre-commit (only what changes) and in CI (the whole bundle). A control nobody runs is not a control."
+  },
+  "language_policy": {
+    "note": "The rule, stated as a test rather than a preference: ANY string this contract renders into an artifact a person reads is content and is Spanish; everything else is configuration and is English. In practice that means `note` is always English -- it is commentary for whoever maintains the contract, and nothing renders it -- while `placeholder`, `guide`, `heading`, the `bundle_schema` strings, the `derived_files` strings and the classification `description`/`handling` are always Spanish. Field KEYS stay as production writes them. Enum VALUES split by scope: per-type enums are Spanish because they live in 10.000 documents and renaming them is a corpus migration; the two common-field enums (`status`, `classification`) are English because they travel in every document next to each other and `status` comes from OKF.",
+    "config": "en",
+    "content": "es",
+    "history": "Two leaks were found by applying this rule after the fact. The classification `description`/`handling` had been translated to English and were rendering inside the bundle's own ESQUEMA.md. And `placeholder` did not exist: the generator fell back to `note`, so `Sistema.dueño` emitted a full English paragraph about migration costs and check numbers into the user's document. Separating the two roles is what fixed it -- one string cannot serve both an engineer and a reader."
+  },
+  "location_rules": {
+    "note": "Locations are ROUTING data, not documentation. `brain place` answers 'where does this document go', so /x-procesar-inbox no longer decides destinations from prose spread across three skill modules, and V19 validates against the same declaration. A pattern may be a plain string or an object with `when` (same shape as derived_files.where) and `role`.",
+    "placeholders": "Every `{name}` in a path must be a field the type declares. Enforced by kernel/tests/test_roundtrip.py -- making locations routable is what exposed that Insumo, Playbook and Iniciativa itself referenced `{proyecto}` without declaring it.",
+    "ambiguity": "If exactly one pattern applies, `brain place` answers. If several do, it returns the candidates and the agent chooses. The tool removes the prose, never the judgement.",
+    "roles": { "active": "destino de un documento nuevo", "archive": "dónde queda tras /x-cierre-periodo; válido para validar, nunca para enrutar" }
+  },
+
+  "frontmatter_rules": {
+    "note": "Rules an agent must follow when WRITING frontmatter. They exist because our parser is deliberately lenient and the viewer the user opens is not: a value our validator accepted made Obsidian and VS Code fail with 'mapping values are not allowed here', and users reported it. Enforced by V18, so this is a check and not a suggestion.",
+    "agent_rules_es": [
+      "Nunca escribas `: ` (dos puntos y espacio) dentro de un valor sin entrecomillar. Es el indicador de clave y valor en YAML, y rompe el visor. Usa una coma, un guion o un punto y coma — o entrecomilla el valor completo.",
+      "Nunca escribas ` #` (espacio y almohadilla) dentro de un valor: YAML lo lee como comentario y **borra en silencio todo lo que sigue**. Ni siquiera `--fix` puede recuperarlo, porque no hay forma de saber si querías un comentario.",
+      "No empieces un valor por `- ? : , [ ] { } # & * ! | > ' \" % @` — todos son indicadores de YAML.",
+      "Para un campo de texto, si el valor es `true`, `no`, `on`, `null` o parece un número, entrecomíllalo: YAML lo convertiría de tipo.",
+      "Ante la duda, entrecomilla con comillas dobles y escapa las que haya dentro. Entrecomillar de más nunca rompe nada.",
+      "La prosa larga va en el cuerpo del documento, no en el frontmatter. El frontmatter es para metadatos cortos y consultables."
+    ],
+    "enforced_by": "V18",
+    "auto_fix": "`brain.py validate --fix` entrecomilla los valores cuyo significado no cambia al hacerlo, y lo verifica reparseando cada línea antes de escribirla. Los que sí cambiarían de significado se reportan para que los resuelva una persona."
+  },
+
+  "severity_policy": {
+    "note": "Migration ladder. Constraints that v1's templates already guaranteed ship as `error`. Constraints introduced by OKF v0.2 ship as `warning` in profile_version 1, so a real brain does not light up on day one. Tightening a constraint means flipping it to `error` and bumping profile_version.",
+    "default": "error"
+  },
+
+  "data_types": {
+    "text":       { "note": "single-line string" },
+    "sentence":   { "note": "single-line string, one sentence", "max_chars": 200 },
+    "date":       { "note": "YYYY-MM-DD" },
+    "datetime":   { "note": "ISO 8601 with an explicit UTC offset, e.g. 2026-08-28T14:00:00Z" },
+    "boolean":    { "note": "true | false" },
+    "enum":       { "note": "one of `values`" },
+    "list":       { "note": "inline [a, b] or block; element type in `of`" },
+    "link":       { "note": "bundle-relative path starting with /, or the reserved /raw/ pointer" },
+    "typed-ref":  { "note": "link whose target must carry the type named in `to`" },
+    "type-key":   { "hint": "el slug del proyecto; `transversal` si no pertenece a ninguno", "note": "reference by KEY VALUE rather than by path: the value must match the `key` field of some document of type `to`. Exists because `proyecto: 2026-q3-erp` is written that way in every document in production -- turning it into a link would be a corpus migration. `sentinels` lists values that are valid without resolving." },
+    "person-ref": { "note": "accountability pointer. A bundle link to a Persona resolves and is checked; free text is tolerated and reported by V17 as unresolved stewardship. Migration-friendly by design: ownership becomes queryable progressively instead of behind a wall of errors." },
+    "actor":      { "note": "matches one of the patterns in `actors`" },
+    "map":        { "note": "single-level inline mapping; member types in `fields`" }
+  },
+  "actors": {
+    "note": "Per OKF v0.2 section 7. Trust classification keys off the `human:` prefix, so it must be used for hand-authored or human-confirmed content. There is no `agent:` prefix -- agents use producer/version.",
+    "person":  "^human:[a-z0-9._-]+$",
+    "process": "^process:[a-z0-9._-]+$",
+    "agent":   "^[a-z0-9._-]+/[a-z0-9._-]+$"
+  },
+  "classification": {
+    "note": "Proposed taxonomy: the organization had none defined. Four levels ordered from least to most restrictive. The ORDER is load-bearing -- V16 compares against each type's floor. If the organization adopts its own taxonomy, replace it here and every generated artifact follows.",
+    "field": "classification",
+    "default_min": "internal",
+    "min_note": "Per-type floor. `min_classification` is declared only where it exceeds `default_min`, so the exception is the thing you read. A document BELOW its floor is an ERROR, never a warning: it is the one classification control that does not relax during migration.",
+    "value_language_note": "These enum VALUES are English, unlike every other enum in this contract. The reason the others stayed Spanish was migration cost -- they live in the frontmatter of every document in production. This field is new in v2, so no document carries it and the cost is zero. It also sits next to `status` (draft|stable|deprecated, from OKF) in every single document, and two adjacent lifecycle enums in two languages is a wart. The resulting line is principled rather than arbitrary: COMMON fields follow OKF and are English; PER-TYPE fields follow production and are Spanish.",
+    "levels": [
+      {
+        "value": "public",
+        "description": "Puede salir de la organización sin daño.",
+        "handling": "Sin restricción."
+      },
+      {
+        "value": "internal",
+        "description": "Uso interno; sin daño material si circula dentro de la organización.",
+        "handling": "No compartir fuera. Es el piso por defecto: la ausencia de clasificación nunca significa público."
+      },
+      {
+        "value": "confidential",
+        "description": "Limitado a quien lo necesita. Incluye dato personal, información de clientes y detalle operativo sensible.",
+        "handling": "No compartir fuera del equipo con necesidad de conocer. Revisar antes de exportar un cerebro que los contenga."
+      },
+      {
+        "value": "restricted",
+        "description": "Material regulatorio, legal o de seguridad. Su divulgación tiene consecuencias formales.",
+        "handling": "Requiere autorización explícita del dueño del dato. Revisar antes de cualquier compartición o respaldo fuera del perímetro."
+      }
+    ]
+  },
+
+  "common_fields": {
+    "type":        { "data_type": "text", "required": true, "is_type": true,
+                     "note": "The only field OKF always requires. A concept carrying just `type` is fully conformant." },
+    "title":       { "data_type": "text", "required": true, "placeholder": "nombre del concepto",
+                   "note": "human-readable name of the concept" },
+    "description": { "data_type": "sentence", "required": true, "placeholder": "qué es y por qué importa, en una oración",
+                   "note": "one sentence: what it is and why it matters" },
+    "tags":        { "data_type": "list", "of": "text", "required": true, "severity": "warning",
+                   "hint": "etiquetas cortas para agrupar; lista vacía es válida" },
+
+    "classification": {
+      "data_type": "enum",
+      "values_from": "classification.levels",
+      "default_from": "classification.default_min",
+      "required": true,
+      "severity": "warning",
+      "note": "Sensitivity level. The allowed values are RESOLVED from the taxonomy at load time rather than repeated here -- writing the list twice in one file is exactly the drift this contract exists to prevent, and it had been written twice. Required, but only a warning in profile 1 because the production corpus does not carry it yet. Each type declares a `min_classification`; going below it is an error, not a warning. Replaces v1's prose rule (`no sensitive data`), which enforced nothing because it lived inside a template guide string."
+    },
+
+    "generated": {
+      "data_type": "map",
+      "required": true,
+      "severity": "warning",
+      "hint": "quién produjo el documento y cuándo cambió su contenido por última vez",
+      "fields": {
+        "by": { "data_type": "actor", "required": true },
+        "at": { "data_type": "datetime", "required": true }
+      },
+      "note": "OKF v0.2. `at` is the time of the last meaningful content change. Replaces v1's `timestamp`."
+    },
+    "verified": {
+      "data_type": "list",
+      "of": "map",
+      "accepts_scalar": true,
+      "required": false,
+      "hint": "sin una entrada de un actor `human:`, el documento es una propuesta, no conocimiento",
+      "fields": {
+        "by": { "data_type": "actor", "required": true },
+        "at": { "data_type": "datetime", "required": true }
+      },
+      "note": "OKF v0.2. A bare mapping MUST be treated as a one-element list. A document with no verified entry from a `human:` actor is a proposal, not knowledge -- this is the human-review rule expressed in the schema instead of in a prompt."
+    },
+    "sources": {
+      "data_type": "list",
+      "of": "map",
+      "required": false,
+      "hint": "de dónde salió cada afirmación; `resource` es obligatorio en cada entrada",
+      "fields": {
+        "resource":      { "required": true, "note": "absolute URL, bundle-relative path, or /raw/ pointer" },
+        "id":            { "data_type": "text", "note": "stable key for per-claim attribution via footnotes" },
+        "title":         { "data_type": "text" },
+        "author":        { "data_type": "actor" },
+        "last_modified": { "data_type": "datetime" }
+      },
+      "note": "OKF v0.2 provenance."
+    },
+    "status": {
+      "data_type": "enum",
+      "values": ["draft", "stable", "deprecated"],
+      "default": "stable",
+      "required": false,
+      "note": "OKF v0.2 lifecycle. Absent means stable."
+    },
+    "stale_after": {
+      "data_type": "datetime",
+      "required": false,
+      "hint": "fecha a partir de la cual el dato debe revisarse antes de usarse",
+      "note": "OKF v0.2. A concept is stale once now >= stale_after. Turns obsolescence from a judgement call into a date comparison."
+    },
+
+    "timestamp": {
+      "data_type": "datetime",
+      "required": false,
+      "deprecated_by": "generated.at",
+      "hint": "no usar en documentos nuevos",
+      "severity": "warning",
+      "note": "v1 field, not part of OKF. `brain validate --fix` moves it to generated.at and leaves generated.by as a declared gap when git history cannot resolve it."
+    }
+  },
+  "types": {
+
+    "Iniciativa": {
+      "description": "The CONTEXT.md of each project or objective with an identity of its own",
+      "location": [
+        { "path": "01-proyectos/{proyecto}/", "role": "active" },
+        { "path": "04-archivo/{periodo}/{proyecto}/", "role": "archive" }
+      ],
+      "filename": "CONTEXT.md",
+      "key": "proyecto",
+      "fields": {
+        "proyecto": { "data_type": "text", "required": true, "is_key": true,
+                      "placeholder": "slug de la carpeta, ej. 2026-q3-migracion-erp",
+                      "note": "The project slug, and the identity every other type points at with `proyecto`. It existed only as a folder name until now, so nothing could resolve a reference to it and cut 2 would have had to derive the join key from the file path." },
+        "origen":   { "data_type": "enum", "values": ["proyecto-asignado", "objetivo-personal", "objetivo-equipo"], "required": true },
+        "periodo":  { "data_type": "text", "required": true, "placeholder": "según el formato de PERFIL.md, ej. 2026-Q3", "note": "format declared in cerebro/PERFIL.md, e.g. 2026-Q3" },
+        "estado":   { "data_type": "enum", "values": ["iniciando", "en-progreso", "bloqueada", "entregada"], "default": "iniciando", "required": true },
+        "sistemas": { "data_type": "list", "of": "typed-ref", "to": "Sistema" },
+        "personas": { "data_type": "list", "of": "typed-ref", "to": "Persona" }
+      },
+      "sections": [
+        { "heading": "Qué es", "guide": "Un párrafo: qué se construye/modifica, para quién, por qué ahora.", "required": true },
+        { "heading": "Qué significa \"entregado\"", "guide": "La definición de éxito. Los agentes la usan como directiva: si una sesión deriva sin avanzar hacia esto, señalarlo.", "required": true },
+        { "heading": "Personas clave", "guide": "enlace a la ficha + su rol en esta iniciativa", "required": false },
+        { "heading": "Estado actual", "guide": "Última actualización, estado corto, qué pasó, qué sigue, qué bloquea.", "required": true }
+      ]
+    },
+
+    "Plan": {
+      "description": "The PLAN.md of a project: the tasks that lead to \"delivered\", grouped by phase",
+      "location": ["01-proyectos/{proyecto}/"],
+      "filename": "PLAN.md",
+      "note": "Introduced by v1 kernel 1.4.0. Its task rows live INSIDE the document as a markdown table, which is the first structured data this system has below document level. That is why cerebro/PENDIENTES.md cannot be generated yet -- see its entry in derived_files.",
+      "fields": {
+        "proyecto":         { "data_type": "type-key", "to": "Iniciativa", "sentinels": ["transversal"], "required": true },
+        "fuente-de-verdad": { "data_type": "enum", "values": ["cerebro", "externa"], "default": "cerebro", "required": true,
+                              "hint": "`externa` si las tareas ya viven en Jira, Asana o un Excel del área; entonces este plan es un espejo y ningún skill afirma progreso global" },
+        "tracker-externo":  { "data_type": "text", "required": false,
+                              "placeholder": "URL o nombre del tracker real" },
+        "ultima-revision":  { "data_type": "date", "required": true,
+                              "placeholder": "AAAA-MM-DD de la última vez que se revisó contra la realidad" }
+      },
+      "conditions": [
+        {
+          "if": { "fuente-de-verdad": "externa" },
+          "then_required": ["tracker-externo"],
+          "note": "A plan declared a mirror with no pointer to what it mirrors is worse than no plan: it looks authoritative and is not."
+        }
+      ],
+      "sections": [
+        { "heading": "Entregado", "guide": "Copia literal de la definición de «entregado» del CONTEXT.md. Toda tarea rastrea hasta acá: si no aporta a eso, sobra.", "required": true },
+        { "heading": "Fases", "guide": "una subsección por fase, con su hito y su tabla de tareas: # · Tarea · Responsable · Estado · Límite · Origen", "required": true },
+        { "heading": "Fuera de alcance", "guide": "lo que se decidió NO hacer, con una línea de por qué, para que no vuelva a discutirse", "required": false },
+        { "heading": "Citations", "guide": "el insumo, la reunión o la decisión de donde salieron las tareas", "required": true }
+      ]
+    },
+
+    "Insumo": {
+      "description": "A received document converted to markdown, pointing at its original in /raw/",
+      "location": ["01-proyectos/{proyecto}/00-insumos/"],
+      "min_classification": "confidential",
+      "governance_note": "External material whose content the system does not control. The raised floor forces a conscious declassification instead of assuming what arrived is harmless.",
+      "note": "Not hand-written: `a-markdown.py` emits it. Known v1 drift this contract now catches: .htm and .yml produced `formato: htm` / `formato: yml`, outside the enum.",
+      "fields": {
+        "proyecto": { "data_type": "type-key", "to": "Iniciativa", "sentinels": ["transversal"], "required": true, "default": "transversal" },
+        "formato": { "data_type": "enum", "values": ["pdf", "docx", "pptx", "xlsx", "html", "yaml"], "required": true },
+        "origen":  { "data_type": "link", "required": true, "placeholder": "/raw/AAAA-MM-DD-descripcion-uuid.ext", "note": "/raw/ pointer to the immutable original. Distinct meaning from Iniciativa.origen -- same key, different type, which is why fields are declared per type." }
+      },
+      "sections": [
+        { "heading": "Avisos de conversión", "guide": "Los que emitió el script. Si no hay ninguno, se quita la sección. Nunca se borra un aviso sin resolverlo.", "required": false },
+        { "heading": "Contenido", "guide": "El markdown que produjo la conversión. No se edita para mejorarlo.", "required": true },
+        { "heading": "Citations", "guide": "[1] Original: enlace a /raw/", "required": true }
+      ]
+    },
+
+    "Reunion": {
+      "description": "Processed note from a meeting",
+      "location": ["01-proyectos/{proyecto}/01-reuniones/"],
+      "filename": "{fecha}-{tema}.md",
+      "fields": {
+        "proyecto":   { "data_type": "type-key", "to": "Iniciativa", "sentinels": ["transversal"], "required": true, "default": "transversal" },
+        "fecha":      { "data_type": "date", "required": true },
+        "asistentes": { "data_type": "list", "of": "typed-ref", "to": "Persona" }
+      },
+      "sections": [
+        { "heading": "Resumen", "guide": "3-5 líneas: de qué fue la reunión y qué salió de ella.", "required": true },
+        { "heading": "Decisiones tomadas", "guide": "decisión — quién la tomó / contexto. Si es importante, registrarla con /x-decision y enlazarla.", "required": true },
+        { "heading": "Acuerdos y pendientes", "format": "table", "columns": ["Pendiente", "Responsable", "Fecha límite"], "required": true },
+        { "heading": "Preguntas abiertas surgidas", "guide": "cada una crea su documento Pregunta y se enlaza", "required": false },
+        { "heading": "Notas", "guide": "Detalle relevante que no encaja arriba. Autocontenido: que se entienda sin leer la transcripción.", "required": false },
+        { "heading": "Citations", "guide": "[1] Original: enlace a /raw/", "required": true }
+      ]
+    },
+
+    "Decision": {
+      "description": "Record of a decision with its context, alternatives and consequences",
+      "location": ["01-proyectos/{proyecto}/02-decisiones/"],
+      "filename": "dec-{NNN}-{tema}.md",
+      "fields": {
+        "proyecto":        { "data_type": "type-key", "to": "Iniciativa", "sentinels": ["transversal"], "required": true, "default": "transversal" },
+        "estado":          { "data_type": "enum", "values": ["propuesta", "aceptada", "reemplazada", "obsoleta"], "default": "propuesta", "required": true },
+        "fecha":           { "data_type": "date", "required": true },
+        "decisores":       { "data_type": "list", "of": "typed-ref", "to": "Persona" },
+        "reemplazada_por": { "data_type": "link", "required": false, "note": "new in v2: makes supersession queryable instead of narrative" }
+      },
+      "conditions": [
+        {
+          "if": { "estado": "reemplazada" },
+          "then_required": ["reemplazada_por"],
+          "severity": "warning",
+          "note": "The supersession rule as a structural constraint rather than a prompt instruction. Ships as a warning because v1 recorded supersession in prose; tighten to error once migrated. This is also the hook the bi-temporal fact model hangs off in cut 3."
+        }
+      ],
+      "sections": [
+        { "heading": "Contexto", "guide": "Qué problema o fuerza motiva la decisión. Enlazar documentos, reuniones y lineamientos aplicables.", "required": true },
+        { "heading": "Opciones consideradas", "guide": "una subsección por opción, con pros y contras", "required": true },
+        { "heading": "Decisión", "guide": "Qué se decidió y por qué. Verificar contra decisiones previas y lineamientos: si contradice alguno, decirlo explícitamente.", "required": true },
+        { "heading": "Consecuencias", "guide": "positivas, negativas, compromisos asumidos, trabajo que habilita o bloquea", "required": true },
+        { "heading": "Citations", "guide": "reunión, lineamiento o documento que respalda la decisión", "required": true }
+      ]
+    },
+
+    "Pregunta": {
+      "description": "An open question with a status and an owner",
+      "location": [
+        { "path": "01-proyectos/{proyecto}/05-preguntas/", "when": { "proyecto": { "not": "transversal" } } },
+        { "path": "02-areas/preguntas/", "when": { "proyecto": "transversal" } }
+      ],
+      "fields": {
+        "proyecto":       { "data_type": "type-key", "to": "Iniciativa", "sentinels": ["transversal"], "required": true, "default": "transversal" },
+        "estado":         { "data_type": "enum", "values": ["abierta", "en-progreso", "respondida"], "default": "abierta", "required": true },
+        "responsable":    { "data_type": "person-ref", "required": false, "steward": true, "hint": "a quién se le pregunta; vacío es un hueco declarado, nunca un supuesto", "note": "who to ask. Empty is a declared gap, never a guess." },
+        "bloqueante":     { "data_type": "boolean", "default": false, "required": true },
+        "fecha-creacion": { "data_type": "date", "required": true },
+        "respondida_por": { "data_type": "link", "required": false, "note": "new in v2: what answered it" }
+      },
+      "conditions": [
+        { "if": { "estado": "respondida" }, "then_required": ["respondida_por"], "severity": "warning" }
+      ],
+      "sections": [
+        { "heading": "Contexto", "guide": "De dónde salió la duda. Enlazar la reunión o documento fuente.", "required": true },
+        { "heading": "Avances", "guide": "fecha — lo averiguado hasta ahora, aunque sea parcial", "required": false },
+        { "heading": "Respuesta", "guide": "Pendiente hasta responderse. Al responderse: respuesta completa + fuente + fecha. Evaluar si debe promoverse a Sistema o Lineamiento.", "required": true }
+      ]
+    },
+
+    "Persona": {
+      "description": "Profile of a person in the organization",
+      "location": ["02-areas/personas/"],
+      "personal_data": true,
+      "min_classification": "confidential",
+      "governance_note": "Holds personal data: name, role, reporting line. The floor is enforced by code, not by a prose rule. This is also the first type to review before any sharing or export of the brain.",
+      "fields": {
+        "rol":       { "data_type": "text", "required": true, "placeholder": "ej. Líder de Producto" },
+        "equipo":    { "data_type": "text", "required": false },
+        "reporta-a": { "data_type": "typed-ref", "to": "Persona", "required": false, "hint": "vacío es un hueco declarado con su Pregunta; nunca se infiere de un correo ni de un organigrama parcial", "note": "empty is a declared gap in the org chart and must have its own Pregunta. Never inferred from an email header or a partial chart." }
+      },
+      "sections": [
+        { "heading": "Qué sabe / qué maneja", "guide": "dominios, sistemas o temas en los que es la referencia", "required": true },
+        { "heading": "Cómo trabaja", "guide": "preferencias, estilo, canales, cosas a tener en cuenta", "required": false },
+        { "heading": "Pendientes conmigo", "format": "table", "columns": ["Pendiente", "Desde", "Origen"], "required": false },
+        { "heading": "Historial relevante", "guide": "fecha — decisión, dato o interacción importante", "required": false }
+      ]
+    },
+
+    "Sistema": {
+      "description": "Profile of a system, tool, product or process of the organization",
+      "location": ["03-recursos/sistemas-y-herramientas/"],
+      "fields": {
+        "dueño":     { "data_type": "person-ref", "required": true, "steward": true, "placeholder": "enlace a la ficha de quien responde, o su nombre", "note": "owner of the system. The key carries an n-tilde and is kept as-is: renaming it would be a migration of every brain in production. As a person-ref, a free-text name is tolerated and reported by V17 until it resolves to a ficha." },
+        "categoria": { "data_type": "enum", "values": ["sistema", "herramienta", "producto", "proceso"], "default": "sistema", "required": true },
+        "estado":    { "data_type": "enum", "values": ["activo", "en-cambio", "deprecado"], "default": "activo", "required": true }
+      },
+      "sections": [
+        { "heading": "Qué hace", "guide": "Descripción funcional. Sin datos sensibles ni de seguridad.", "required": true },
+        { "heading": "Cómo se relaciona", "guide": "sistemas, herramientas o equipos con los que se conecta o de los que depende", "required": false },
+        { "heading": "Decisiones históricas que lo afectan", "guide": "enlace a la Decision — qué decidió", "required": false },
+        { "heading": "Notas", "guide": "Restricciones conocidas, particularidades, deuda pendiente, a quién preguntar.", "required": false },
+        { "heading": "Citations", "guide": "fuente: reunión, documentación oficial interna", "required": true }
+      ]
+    },
+
+    "Lineamiento": {
+      "description": "A standard, policy or working rule currently in force",
+      "location": ["02-areas/{area}/"],
+      "fields": {
+        "area":     { "data_type": "text", "required": true, "placeholder": "nombre del área en /02-areas/" },
+        "fuente":   { "data_type": "person-ref", "required": true, "steward": true, "placeholder": "quién lo definió — enlace a ficha, comité o área", "note": "who defined it. Accepts a committee or an area as free text; V17 reports it until it points at a ficha." },
+        "vigencia": { "data_type": "enum", "values": ["vigente", "en-revision", "derogado"], "default": "vigente", "required": true, "note": "does the same job as `estado` elsewhere under a different name; kept for compatibility" }
+      },
+      "sections": [
+        { "heading": "El lineamiento", "guide": "La regla, tal como aplica. Concreta y verificable.", "required": true },
+        { "heading": "Cuándo aplica / excepciones", "guide": "alcance y excepciones conocidas", "required": true },
+        { "heading": "Impacto en mi trabajo", "guide": "Qué significa en la práctica para mis entregables y decisiones.", "required": false },
+        { "heading": "Citations", "guide": "reunión o documento donde se comunicó", "required": true }
+      ]
+    },
+
+    "Diagrama": {
+      "description": "A Mermaid/PlantUML diagram with its context",
+      "location": [
+        { "path": "01-proyectos/{proyecto}/03-diagramas/", "when": { "proyecto": { "not": "transversal" } } },
+        { "path": "02-areas/personas/", "when": { "clase": "organizacion" } }
+      ],
+      "filename": "{clase}-{tema}-v{version}.md",
+      "note": "v1's ORGANIGRAMA.md shipped as type Diagrama missing all three of these fields, and 1.4.0 shipped `cronograma` in the skill module and the guide while leaving it out of the template enum. Both defects shipped undetected because nothing validated them. Here the enum is declared once.",
+      "fields": {
+        "proyecto": { "data_type": "type-key", "to": "Iniciativa", "sentinels": ["transversal"], "required": true, "default": "transversal" },
+        "clase":    { "data_type": "enum", "values": ["flujo", "proceso", "secuencia", "entidades", "organizacion", "arquitectura", "cronograma", "otro"], "default": "flujo", "required": true },
+        "version":  { "data_type": "date", "required": true }
+      },
+      "sections": [
+        { "heading": "Diagrama", "guide": "bloque mermaid: flowchart, sequenceDiagram, erDiagram, graph TD", "required": true },
+        { "heading": "Decisiones reflejadas", "guide": "enlace a la Decision — cómo se refleja en el diagrama", "required": false },
+        { "heading": "Supuestos y pendientes", "guide": "cada supuesto sin confirmar debe tener su Pregunta enlazada", "required": false },
+        { "heading": "Historial de versiones", "guide": "fecha — qué cambió respecto a la versión anterior", "required": true }
+      ]
+    },
+
+    "Glosario": {
+      "description": "A term, acronym or piece of internal jargon",
+      "location": ["03-recursos/glosario/"],
+      "fields": {},
+      "field_defaults": { "tags": ["glosario"] },
+      "sections": [
+        { "heading": "Definición", "guide": "Definición completa, con contexto de cómo se usa en la organización.", "required": true },
+        { "heading": "Relacionados", "guide": "enlaces a otros términos del glosario", "required": false }
+      ]
+    },
+
+    "Playbook": {
+      "description": "A reusable step-by-step process, or an archived analysis",
+      "location": [
+        { "path": "01-proyectos/{proyecto}/", "when": { "proyecto": { "not": "transversal" } } },
+        { "path": "03-recursos/", "when": { "proyecto": "transversal" } }
+      ],
+      "fields": {
+        "proyecto": { "data_type": "type-key", "to": "Iniciativa", "sentinels": ["transversal"], "required": true, "default": "transversal" }
+      },
+      "note": "The only base type v1 shipped with NO template, despite being first-class: cerebro/GOALS.md carries it, and /x-nueva-iniciativa creates analisis-inicial.md as one. It is doing double duty -- a reusable process and an archived synthesis are not the same thing, and GOALS (period objectives) is arguably neither. Defined permissively so nothing in production breaks; splitting it is a modelling question for the owner, and CQ-08 is what will force the answer.",
+      "sections": [
+        { "heading": "Propósito", "guide": "qué resuelve y cuándo se usa", "required": true },
+        { "heading": "Contenido", "guide": "los pasos, o el análisis archivado", "required": true },
+        { "heading": "Citations", "guide": "fuentes, si el contenido afirma algo con respaldo", "required": false }
+      ]
+    },
+
+    "Indice": {
+      "description": "A bundle-scope index, regenerated from frontmatter",
+      "location": ["./"],
+      "fields": {},
+      "generated_only": true,
+      "note": "The 12th type, and the one addition to v1's catalog of 11. It exists because OKF requires typed frontmatter on every non-reserved .md, and `index.md`/`log.md` are the only reserved names -- so a bundle-level derived index such as PREGUNTAS-ABIERTAS.md needs a type to be conformant. Never hand-written: `brain derive` and `brain generate` own it.",
+      "sections": []
+    }
+  },
+
+  "reserved_files": {
+    "note": "The filenames OKF reserves. `format` selects which structural check applies, so neither the name nor the rule is repeated in code.",
+    "index.md": { "format": "index", "generated": true, "note": "directory index; no frontmatter except at the bundle root, which may carry okf_version only" },
+    "log.md":   { "format": "log", "note": "date-grouped change history, newest first; headings are ISO YYYY-MM-DD" }
+  },
+  "exempt_files": {
+    "note": "Exempt from the PROFILE checks only -- never from OKF conformance. OKF requires typed frontmatter on every non-reserved .md, so these still need a `type`; what they do not need is to match a catalog type's field set.",
+    "PERFIL.md": "owner context in free prose; written by /x-setup"
+  },
+  "derived_files": {
+    "note": "Regenerated deterministically by `brain derive`. These grow with the brain; having the model rewrite them by hand is Slope A, the cost this contract exists to remove. Each entry declares what to select, how to filter, sort and render, so the engine knows nothing about this brain's types by name. Each also declares the `type` its generated frontmatter carries, so a derived file is fully OKF-conformant with nobody maintaining it.",
+
+    "PREGUNTAS-ABIERTAS.md": {
+      "type": "Indice",
+      "title": "Preguntas abiertas",
+      "description": "Índice global de preguntas sin resolver, ordenadas por bloqueo y antigüedad.",
+      "heading": "Preguntas abiertas",
+      "from": "Pregunta",
+      "render": "table",
+      "where": { "estado": ["abierta", "en-progreso"] },
+      "order_by": [{ "field": "bloqueante", "desc": true }, { "field": "fecha-creacion" }],
+      "flag": { "field": "bloqueante", "prefix": "**[bloqueante]** " },
+      "empty_row": "_ninguna_",
+      "columns": [
+        { "header": "Pregunta",    "value": "title", "link": true },
+        { "header": "Responsable", "value": "responsable", "resolve": true },
+        { "header": "Proyecto",    "value": "proyecto" },
+        { "header": "Días",        "value": "days_since:fecha-creacion" }
+      ]
+    },
+
+    "PENDIENTES.md": {
+      "type": "Indice",
+      "title": "Pendientes",
+      "description": "Índice global de tareas abiertas de todos los planes, vencidas primero.",
+      "heading": "Pendientes",
+      "from": "Plan",
+      "deferred": "No se genera todavía: sus filas viven DENTRO del PLAN.md como tabla markdown, y este generador solo sabe seleccionar documentos y renderizar su frontmatter. Declararlo igual porque `survey.py` lo cuenta para medir la Pendiente A, que con este archivo pasa de dos derivados a tres. Generarlo exige extender `sections` con tipos de columna -- decisión de diseño aparte, es la frontera con el corte 3.",
+      "note": "Introducido por el kernel 1.4.0 de v1. Su sección «Sin proyecto» además agrega los pendientes de las fichas Persona, así que tiene DOS fuentes: otra cosa que el esquema actual de derived_files no expresa."
+    },
+    "02-areas/personas/ORGANIGRAMA.md": {
+      "type": "Diagrama",
+      "title": "Organigrama",
+      "description": "Quién reporta a quién, derivado del campo reporta-a de cada ficha Persona.",
+      "heading": "Organigrama",
+      "fields": { "proyecto": "transversal", "clase": "organizacion" },
+      "from": "Persona",
+      "render": "mermaid-graph",
+      "edge": "reporta-a",
+      "label": "title",
+      "gaps": {
+        "heading": "Huecos declarados",
+        "guide": "Sin `reporta-a`. Cada uno debe tener su Pregunta; nunca se infiere."
+      },
+      "note": "v1 shipped this as type Diagrama with no proyecto, clase or version. Generating it supplies all three, so the defect becomes impossible rather than merely detectable. A missing reporta-a is a declared gap, rendered as such -- never inferred."
+    }
+  },
+  "bundle_schema": {
+    "common_heading": "Campos comunes",
+    "note": "The single generated human-readable spec. A separate kernel-side CATALOGO.md existed and was deleted: it carried the same tables, and its only real advantage -- richer columns -- was an accident of improving one file and not the other. One derived spec, living where the documents are. Content of the portable ESQUEMA.md written into the bundle. It lives here rather than in code because it is content, not configuration: it is what someone who receives the `cerebro/` folder reads to understand it without the kernel. Spanish, like the rest of the bundle.",
+    "path": "ESQUEMA.md",
+    "type": "Indice",
+    "title": "Esquema de datos de este cerebro",
+    "description": "Cómo leer esta base de conocimiento: tipos, campos, convenciones y clasificación.",
+    "intro": "Este archivo hace al cerebro **autodescriptivo y portable**: cualquier persona o sistema que reciba la carpeta `cerebro/` puede entender su base de conocimiento leyendo esto, sin necesitar el kernel. Se genera desde el contrato; no se edita a mano.",
+    "conventions_heading": "Convenciones de lectura",
+    "conventions": [
+      "**Bundle**: esta carpeta es la raíz. Los enlaces que empiezan con `/` se resuelven desde aquí.",
+      "**Puntero externo `/raw/...`**: apunta a las fuentes crudas del sistema que hospeda este cerebro, fuera del bundle. Si recibiste el cerebro sin sus fuentes, esos enlaces estarán rotos: es esperado, el conocimiento integrado está completo igual.",
+      "**Enlaces rotos**: se toleran. Representan conocimiento aún no escrito, no errores.",
+      "Todo `.md` de conocimiento lleva frontmatter con `type`. Se exceptúan `index.md` (índice por carpeta) y `log.md` (historia de cambios, más reciente primero).",
+      "Las fuentes de cada afirmación van al final de cada documento, bajo `# Citations`."
+    ],
+    "structure_heading": "Estructura de carpetas",
+    "structure": {
+      "01-proyectos/": "Trabajo con fecha de fin: una carpeta por proyecto, con su CONTEXT.md, insumos, reuniones, decisiones y preguntas.",
+      "02-areas/": "Responsabilidades continuas. Incluye `personas/` con las fichas y el organigrama.",
+      "03-recursos/": "Referencia: sistemas y herramientas, glosario, y lo que el rol necesite.",
+      "04-archivo/": "Proyectos cerrados, por periodo."
+    },
+    "classification_heading": "Clasificación de datos",
+    "classification_intro": "Cada documento lleva un nivel de clasificación. Cada tipo tiene un **mínimo**: por debajo de él, el documento es inválido. Revisa esto antes de compartir o exportar el cerebro.",
+    "types_heading": "Catálogo de tipos",
+    "types_intro": "Los campos de cada tipo, con su obligatoriedad y valores admitidos. Suficiente para leer los datos —o regenerar las plantillas— sin el kernel.",
+    "type_labels_note": "Bundle-facing one-liner per type. The `description` on each type is engineering metadata in English, for the catalog and the JSON Schemas; this is the same thing said to the person who receives the brain, in the language of the brain. The renderer falls back to `description` when a label is missing.",
+    "type_labels": {
+      "Iniciativa":  "El CONTEXT.md de cada proyecto u objetivo con entidad propia.",
+      "Insumo":      "Documento recibido, convertido a markdown, con puntero a su original en /raw/.",
+      "Reunion":     "Nota procesada de una reunión.",
+      "Decision":    "Registro de una decisión: contexto, alternativas y consecuencias.",
+      "Pregunta":    "Duda abierta, con estado y responsable.",
+      "Persona":     "Ficha de una persona de la organización.",
+      "Sistema":     "Ficha de un sistema, herramienta, producto o proceso.",
+      "Lineamiento": "Estándar, política o regla de trabajo vigente.",
+      "Diagrama":    "Diagrama en Mermaid o PlantUML, con su contexto.",
+      "Glosario":    "Término, sigla o jerga interna de la organización.",
+      "Playbook":    "Proceso reutilizable paso a paso, o un análisis archivado.",
+      "Indice":      "Índice de alcance de bundle, regenerado desde el frontmatter."
+    }
+  }
+}

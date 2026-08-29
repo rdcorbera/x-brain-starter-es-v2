@@ -1,0 +1,156 @@
+# Competency questions -- the acceptance criterion for the data contract.
+#
+# A competency question is something the brain must be able to answer. They are
+# written BEFORE the schema, and the schema is judged by them: if a CQ cannot be
+# answered, the schema failed -- not the implementation.
+#
+# Cutting rule: if no CQ needs a type or a field, it does not enter the contract.
+#
+# Each CQ records which skill depends on it, so a change to the schema shows
+# immediately what it would break.
+#
+# STATUS: draft. These are derived from what v1's skills already do, which is
+# evidence of what the system is for -- but they are not a substitute for the
+# owner's own questions. Review, cut what does not matter, add what is missing.
+#
+# In cut 1 they are answered by hand. In cut 2 each grows a `sql:` key and they
+# become the executable test suite over the DuckDB projection.
+
+version: 1
+profile_version: 1
+
+questions:
+  - id: CQ-01
+    question: "¿Qué preguntas bloqueantes están abiertas hoy, y quién debe cada una?"
+    needed_by: [x-briefing-diario, x-preparar-reunion]
+    types: [Pregunta]
+    fields: [estado, bloqueante, responsable]
+    criterion: "toda fila tiene responsable, o el hueco está marcado explícitamente"
+
+  - id: CQ-02
+    question: "¿Qué preguntas llevan más de N días abiertas sin avance?"
+    needed_by: [x-briefing-diario, x-actualizacion-semanal]
+    types: [Pregunta]
+    fields: [estado, fecha-creacion]
+    criterion: "la antigüedad se calcula, no se estima; el umbral es un parámetro"
+    note: >-
+      v1 dispersa los umbrales en prosa (2, 7 y 14 días en cuatro sitios).
+      Deben venir de un solo lugar.
+
+  - id: CQ-03
+    question: "¿Qué le tengo que preguntar o cobrar a esta persona antes de reunirme con ella?"
+    needed_by: [x-preparar-reunion]
+    types: [Pregunta, Persona]
+    fields: [responsable]
+    criterion: "cruza preguntas abiertas por responsable con los pendientes de su ficha"
+
+  - id: CQ-04
+    question: "¿Qué decisiones están vigentes en el proyecto X, y cuál es la fuente de cada una?"
+    needed_by: [x-consultar, x-decision, x-diagrama]
+    types: [Decision]
+    fields: [proyecto, estado, sources]
+    criterion: "toda fila devuelta tiene fuente verificable y estado 'aceptada'"
+
+  - id: CQ-05
+    question: "¿Qué decisiones fueron reemplazadas, por cuál y cuándo?"
+    needed_by: [x-decision, x-curar]
+    types: [Decision]
+    fields: [estado, fecha]
+    criterion: "toda decisión 'reemplazada' dice qué la reemplazó; ninguna desaparece"
+    note: >-
+      Es la regla de contradicciones hecha consultable. Hoy v1 la deja como nota
+      en prosa dentro del documento superado.
+
+  - id: CQ-06
+    question: "¿Qué lineamientos vigentes aplican a este proyecto o área?"
+    needed_by: [x-decision, x-preparar-reunion]
+    types: [Lineamiento]
+    fields: [area, vigencia]
+    criterion: "distingue vigente de en-revision de derogado, y nunca mezcla los tres"
+
+  - id: CQ-07
+    question: "¿Qué decidimos sobre X y por qué? ¿Qué alternativas se descartaron?"
+    needed_by: [x-consultar]
+    types: [Decision]
+    criterion: "la respuesta cita el documento y su sección de opciones consideradas"
+
+  - id: CQ-08
+    question: "¿Ya intentamos algo parecido antes? ¿Con qué resultado?"
+    needed_by: [x-consultar, x-cierre-periodo]
+    types: [Decision, Iniciativa, Playbook]
+    fields: [estado, periodo]
+    criterion: "alcanza iniciativas archivadas, no solo las del periodo actual"
+
+  - id: CQ-09
+    question: "¿En qué estado está cada iniciativa del periodo y qué la bloquea?"
+    needed_by: [x-briefing-diario, x-actualizacion-semanal]
+    types: [Iniciativa]
+    fields: [estado, periodo]
+    criterion: "'bloqueada' se puede cruzar con las preguntas bloqueantes que la causan"
+
+  - id: CQ-10
+    question: "¿Quién reporta a quién, y qué huecos tiene el organigrama?"
+    needed_by: [x-setup, x-procesar-inbox, x-curar]
+    types: [Persona]
+    fields: [reporta-a]
+    criterion: >-
+      un reporta-a vacío es un hueco declarado con su Pregunta asociada,
+      nunca un valor inventado
+
+  - id: CQ-11
+    question: "¿Qué documentos tocan a esta persona, sistema o proyecto, y en qué rol?"
+    needed_by: [x-procesar-inbox, x-consultar]
+    types: [Reunion, Decision, Iniciativa, Sistema]
+    fields: [asistentes, decisores, personas, sistemas]
+    criterion: >-
+      acota la detección de páginas afectadas a la entidad, en vez de barrer
+      el cerebro. Es la CQ que ataca la Pendiente B.
+
+  - id: CQ-12
+    question: "¿Qué decisiones afectan a este sistema y cuáles siguen vigentes?"
+    needed_by: [x-diagrama, x-consultar]
+    types: [Sistema, Decision]
+    fields: [estado]
+    criterion: "el diagrama de un sistema no refleja decisiones ya reemplazadas"
+
+  - id: CQ-13
+    question: "¿Qué documentos pasaron su fecha de caducidad y siguen marcados como vigentes?"
+    needed_by: [x-curar]
+    types: []  # aplica a todos
+    fields: [status, stale_after]
+    criterion: "es una comparación de fechas, no un juicio del modelo"
+    note: >-
+      Esta CQ solo es respondible gracias a OKF v0.2. En v1 la obsolescencia
+      era uno de los checks de juicio de /x-curar.
+
+  - id: CQ-14
+    question: "¿Qué escribió un agente y todavía no confirmó ninguna persona?"
+    needed_by: [x-curar]
+    types: []  # aplica a todos
+    fields: [generated, verified]
+    criterion: >-
+      un documento sin verified de un actor human: es una propuesta, no
+      conocimiento. Es la regla de revisión humana hecha consultable.
+
+# Preguntas adversariales: cosas que el sistema NO debe poder responder mal.
+# Se prueban igual que las anteriores, pero pasan cuando el sistema se niega
+# o advierte, no cuando contesta.
+
+adversarial:
+  - id: ADV-01
+    question: "¿Cuál es el lineamiento vigente sobre X?"
+    must_not: "devolver un lineamiento con vigencia 'derogado' o 'en-revision' como si fuera vigente"
+
+  - id: ADV-02
+    question: "¿Qué decidimos sobre X?"
+    must_not: "devolver una decisión 'reemplazada' sin decir que fue reemplazada y por cuál"
+
+  - id: ADV-03
+    question: "¿A quién le reporta esta persona?"
+    must_not: "inferir la jerarquía de un correo, un organigrama parcial o el contexto"
+
+  - id: ADV-04
+    question: "¿Cuál es el estado de este proyecto?"
+    must_not: >-
+      responder desde un documento cuyo stale_after ya venció sin advertir
+      que el dato puede estar obsoleto
