@@ -11,12 +11,16 @@ proyecto: transversal
 
 # Propósito
 
-<qué resuelve y cuándo se usa>
+<qué resuelve y cuándo aplicarlo>
 
-# Contenido
+# Pasos
 
-<los pasos, o el análisis archivado>
+<la secuencia a seguir, en orden y accionable>
+
+# Resultado esperado
+
+<cómo se sabe que salió bien>
 
 # Citations
 
-<fuentes, si el contenido afirma algo con respaldo>
+<de dónde sale el proceso, si viene de algún sitio>

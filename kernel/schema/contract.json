@@ -1,5 +1,5 @@
 {
-  "note": "Single source of truth for this brain's data contract. Templates, JSON Schemas, the catalog, the portable bundle schema, the skill stubs, the directory indexes, the derived indexes and (in cut 2) the DuckDB DDL are all GENERATED from this file. Never edit a generated artifact; edit this and run `brain generate`. READING ORDER -- the top-level keys are ordered as a narrative, separated by blank lines, rather than nested into groups: (1) what this contract is -- note, versions, provenance, governance, and the policies it is written under; (2) the vocabulary the schema is written in -- data types, actors, and the classification ladder, each defined before it is used; (3) the schema itself -- common_fields and types, which are 59% of the file; (4) the files it produces -- reserved, exempt, derived, and the portable bundle schema. Grouping these into nested objects was considered and rejected: the groups are wildly uneven, the boundaries are genuinely ambiguous (classification is both vocabulary and policy), and nesting would lengthen every access path and every provenance entry for no functional gain.",
+  "note": "Single source of truth for this brain's data contract. Templates, JSON Schemas, the catalog, the portable bundle schema, the skill stubs, the directory indexes, the derived indexes and (in cut 2) the SQLite DDL are all GENERATED from this file. Never edit a generated artifact; edit this and run `brain generate`. READING ORDER -- the top-level keys are ordered as a narrative, separated by blank lines, rather than nested into groups: (1) what this contract is -- note, versions, provenance, governance, and the policies it is written under; (2) the vocabulary the schema is written in -- data types, actors, and the classification ladder, each defined before it is used; (3) the schema itself -- common_fields and types, which are 59% of the file; (4) the files it produces -- reserved, exempt, derived, and the portable bundle schema. Grouping these into nested objects was considered and rejected: the groups are wildly uneven, the boundaries are genuinely ambiguous (classification is both vocabulary and policy), and nesting would lengthen every access path and every provenance entry for no functional gain.",
   "okf_version": "0.2",
   "profile_version": 1,
 
@@ -418,6 +418,7 @@
       "location": ["03-recursos/glosario/"],
       "fields": {},
       "field_defaults": { "tags": ["glosario"] },
+      "note": "STRUCTURAL, decided 2026-08-31. No competency question needs it as a subject and it declares no required fields -- its content is prose by nature, so nothing about it is queryable. The cutting rule would drop it; it stays for the reason `Insumo` and `Indice` stay: it serves by being READ, not queried. Cutting it would also solve nothing -- OKF requires a `type` on every knowledge file, production holds 8 of these, and no other type houses the definition of a term. Not modelled in the cut-2 projection beyond its identity.",
       "sections": [
         { "heading": "Definición", "guide": "Definición completa, con contexto de cómo se usa en la organización.", "required": true },
         { "heading": "Relacionados", "guide": "enlaces a otros términos del glosario", "required": false }
@@ -425,7 +426,7 @@
     },
 
     "Playbook": {
-      "description": "A reusable step-by-step process, or an archived analysis",
+      "description": "A reusable step-by-step process, meant to be followed again",
       "location": [
         { "path": "01-proyectos/{proyecto}/", "when": { "proyecto": { "not": "transversal" } } },
         { "path": "03-recursos/", "when": { "proyecto": "transversal" } }
@@ -433,11 +434,32 @@
       "fields": {
         "proyecto": { "data_type": "type-key", "to": "Iniciativa", "sentinels": ["transversal"], "required": true, "default": "transversal" }
       },
-      "note": "The only base type v1 shipped with NO template, despite being first-class: cerebro/GOALS.md carries it, and /x-nueva-iniciativa creates analisis-inicial.md as one. It is doing double duty -- a reusable process and an archived synthesis are not the same thing, and GOALS (period objectives) is arguably neither. Defined permissively so nothing in production breaks; splitting it is a modelling question for the owner, and CQ-08 is what will force the answer.",
+      "note": "Split from `Analisis` on 2026-08-31. It was defined as a reusable process OR an archived analysis -- the OR was the defect, and the competency questions forced the answer the cutting rule promised: CQ-44 asks for processes to reuse (decision: reutilizar en vez de improvisar) while CQ-34 asks for precedent not to repeat. Different `decision`, `frequency` and `answer_shape`, so two types. The cut: a Playbook is FOLLOWED, an Analisis is CONSULTED -- if a document does not say `next time, do this`, it is not a Playbook. MIGRATION: production holds 23 documents of this type needing triage by hand; /x-nueva-iniciativa creates analisis-inicial.md as a Playbook, and those are Analisis. STILL UNRESOLVED: v1 cerebro/GOALS.md carries this type and is neither -- it is period objectives, and no competency question asks for it.",
       "sections": [
-        { "heading": "Propósito", "guide": "qué resuelve y cuándo se usa", "required": true },
-        { "heading": "Contenido", "guide": "los pasos, o el análisis archivado", "required": true },
-        { "heading": "Citations", "guide": "fuentes, si el contenido afirma algo con respaldo", "required": false }
+        { "heading": "Propósito", "guide": "qué resuelve y cuándo aplicarlo", "required": true },
+        { "heading": "Pasos", "guide": "la secuencia a seguir, en orden y accionable", "required": true },
+        { "heading": "Resultado esperado", "guide": "cómo se sabe que salió bien", "required": false },
+        { "heading": "Citations", "guide": "de dónde sale el proceso, si viene de algún sitio", "required": false }
+      ]
+    },
+
+    "Analisis": {
+      "description": "A one-off study of a subject, archived as precedent",
+      "location": [
+        { "path": "01-proyectos/{proyecto}/", "when": { "proyecto": { "not": "transversal" } } },
+        { "path": "03-recursos/", "when": { "proyecto": "transversal" } }
+      ],
+      "fields": {
+        "proyecto": { "data_type": "type-key", "to": "Iniciativa", "sentinels": ["transversal"], "required": true, "default": "transversal" },
+        "fecha": { "data_type": "date", "required": true, "note": "An analysis is a point-in-time artefact: without a date it cannot be read as precedent, which is the whole reason it is kept. CQ-34 orders by it." }
+      },
+      "note": "The half of the old `Playbook` that is consulted rather than followed, split out on 2026-08-31. Kept because CQ-34 -- what is on record about this from earlier periods -- is answered by archived analyses as much as by decisions and initiatives, and its decision is `no repetir un intento ya hecho`. Spanish and unaccented, like `Reunion` and `Decision`. Named deliberately away from `Informe`, `Entregable` and `Recurso`: the competency-question research flagged the emitted deliverable and `Recurso` as separate unnamed gaps, and taking those names now would claim ground that belongs to them.",
+      "sections": [
+        { "heading": "Pregunta", "guide": "qué se quería averiguar", "required": true },
+        { "heading": "Método", "guide": "cómo se averiguó, para que alguien pueda juzgar el peso del hallazgo", "required": false },
+        { "heading": "Hallazgos", "guide": "lo que se encontró", "required": true },
+        { "heading": "Conclusión", "guide": "qué se concluye, y qué queda sin responder", "required": true },
+        { "heading": "Citations", "guide": "fuentes en las que se apoya", "required": false }
       ]
     },
 
@@ -547,7 +569,8 @@
       "Lineamiento": "Estándar, política o regla de trabajo vigente.",
       "Diagrama":    "Diagrama en Mermaid o PlantUML, con su contexto.",
       "Glosario":    "Término, sigla o jerga interna de la organización.",
-      "Playbook":    "Proceso reutilizable paso a paso, o un análisis archivado.",
+      "Playbook":    "Proceso reutilizable paso a paso, para volver a seguirlo.",
+      "Analisis":    "Estudio puntual de un asunto, archivado como precedente.",
       "Indice":      "Índice de alcance de bundle, regenerado desde el frontmatter."
     }
   }

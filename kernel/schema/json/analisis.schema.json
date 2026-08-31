@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "playbook.schema.json",
-  "title": "Playbook",
-  "description": "A reusable step-by-step process, meant to be followed again",
+  "$id": "analisis.schema.json",
+  "title": "Analisis",
+  "description": "A one-off study of a subject, archived as precedent",
   "type": "object",
   "properties": {
     "type": {
@@ -75,6 +75,10 @@
     },
     "proyecto": {
       "type": "string"
+    },
+    "fecha": {
+      "type": "string",
+      "format": "date"
     }
   },
   "required": [
@@ -84,6 +88,7 @@
     "tags",
     "classification",
     "generated",
-    "proyecto"
+    "proyecto",
+    "fecha"
   ]
 }

@@ -335,7 +335,7 @@ def report(m: dict) -> None:
     elif total > 5000:
         out(f"    {total:,} tokens per ingest is worth removing, but check whether")
         out("    discovery (finding affected pages among N docs) costs more.")
-        out("    If it does, pull the DuckDB projection into cut 1.")
+        out("    If it does, pull the projection into cut 1.")
     else:
         out(f"    {total:,} tokens per ingest is marginal. The spend is likely in")
         out("    DISCOVERY, not regeneration -- compress the plan and bring the")
@@ -366,7 +366,7 @@ def report(m: dict) -> None:
     elif sa > sb * 2:
         out("  -> A domina. El corte 1 la elimina entera: el plan está bien ordenado.")
     elif sb > sa * 2:
-        out("  -> B domina. COMPRIME EL PLAN: adelanta la proyección DuckDB al corte 1.")
+        out("  -> B domina. COMPRIME EL PLAN: adelanta la proyección al corte 1.")
     else:
         out("  -> comparables. Mantén el orden, pero no difieras B más de un corte.")
     out()

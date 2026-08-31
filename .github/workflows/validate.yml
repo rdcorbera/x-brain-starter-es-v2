@@ -46,10 +46,22 @@ jobs:
       - name: Round-trip -- generador y validador se comprueban entre sí
         run: python kernel/tests/test_roundtrip.py
 
-      # survey.py es el preflight y su piso es 3.9, no 3.11: si alguien le
-      # cuela sintaxis moderna, deja de correr donde tiene que correr.
-      - name: survey.py sigue compilando contra su propio piso (3.9)
-        run: python -c "import ast,pathlib; ast.parse(pathlib.Path('kernel/bin/survey.py').read_text(encoding='utf-8'), feature_version=(3,9))"
+      # Los dos preflight tienen piso 3.9, no 3.11: corren en la máquina de
+      # destino ANTES de que se instale nada. Si alguien les cuela sintaxis
+      # moderna, dejan de correr donde tienen que correr.
+      - name: Los preflight siguen compilando contra su propio piso (3.9)
+        run: |
+          for f in kernel/bin/survey.py kernel/bin/sqlite-probe.py; do
+            python -c "import ast,pathlib,sys; ast.parse(pathlib.Path(sys.argv[1]).read_text(encoding='utf-8'), feature_version=(3,9))" "$f"
+            echo "  $f OK"
+          done
+
+      # La sonda no la ejercita nada más, y 322 líneas que nadie corre se
+      # pudren. Aquí además vigila algo que no controlamos: si un build futuro
+      # de Python dejara de traer FTS5, nos enteramos ahora y no al empezar el
+      # corte 2. Corre contra un directorio temporal, nunca contra el repo.
+      - name: Sonda SQLite -- ¿sigue siendo viable la proyección del corte 2?
+        run: python kernel/bin/sqlite-probe.py "$(python -c 'import tempfile;print(tempfile.mkdtemp())')"
 
       - name: Validar el bundle
         run: |

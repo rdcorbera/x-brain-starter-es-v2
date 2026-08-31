@@ -15,13 +15,18 @@
 # personal information management, transactive memory, records management),
 # with the evidence hierarchy applied as a weighting filter.
 #
-# What the literature could NOT settle, and only this brain's own usage log can:
+# What the literature could NOT settle:
 #   - `frequency` on 9 questions, marked `# inferred` where the number is a
 #     reasoned guess from general studies rather than a measurement of this role.
 #   - `cost_today` likewise where marked.
 #   - the `asked_by` labels, which are tentative.
-# Crossing these against v1's real usage log is the next step, not a formality:
-# an inferred `mensual`/`esporadica` with no real query in a quarter gets cut.
+#
+# These were left pending "until we cross them against v1's usage log". That log
+# DOES NOT EXIST: v1's `log.md` records writes ("quien escribe, loguea"), not
+# questions asked. Nothing in v1 records a query. So `frequency` cannot be
+# settled by looking backwards -- it has to be instrumented going forward, or
+# left as the reasoned guess it is. Recorded here so nobody waits on evidence
+# that is never coming.
 #
 # Eight mismatches against the contract were found and corrected on intake --
 # `status=vigente` (the OKF value is `stable`), `estado=vigente` on Decision
@@ -182,11 +187,11 @@ questions:
       Iniciativa). El periodo es un rango sobre `fecha`.
 
   - id: CQ-34
-    question: "¿Qué decisiones e iniciativas hay registradas sobre este tema en periodos anteriores?"
+    question: "¿Qué decisiones, iniciativas y análisis hay registrados sobre este tema en periodos anteriores?"
     asked_by: "rol individual"
-    types: [Decision, Iniciativa]
-    fields: [proyecto, periodo, estado]
-    criterion: "Decision/Iniciativa filtradas por proyecto y periodo anterior"
+    types: [Decision, Iniciativa, Analisis]
+    fields: [proyecto, periodo, estado, fecha]
+    criterion: "Decision/Iniciativa/Analisis filtrados por proyecto y periodo anterior"
     decision: "no repetir un intento ya hecho; recuperar el precedente"
     frequency: esporadica
     answer_shape: lista
@@ -197,6 +202,11 @@ questions:
       es una CQ: es juicio de similitud. Esta variante estructural por proyecto
       y periodo sí lo es.
     cost_today: "preguntar a un veterano si «ya se intentó esto»"
+    note: >-
+      `Analisis` se añadió aquí al escindir Playbook (2026-08-31). No es un tipo
+      nuevo buscándose una pregunta: es que ESTA pregunta ya se respondía con
+      análisis archivados, y hasta ahora venían tipados como Playbook. Sin esto,
+      el tipo escindido nacería huérfano y la regla de corte lo dejaría fuera.
 
   # -- iniciativas, planes y dependencias ------------------------------------
 
@@ -502,8 +512,9 @@ type_verdicts:
   Diagrama:    {verdict: weak,       by: [CQ-38], note: "consulta navegacional real pero marginal. Se producen más de lo que se consultan"}
   Insumo:      {verdict: structural, by: [CQ-43], note: "la única pregunta que lo toca es de procedencia en auditoría, no de contenido. Existe por el manifiesto de originales"}
   Indice:      {verdict: structural, by: [], note: "ninguna CQ lo necesita como sujeto. Es el índice generado que sirve a las preguntas que no crecen con N, y OKF exige frontmatter tipado"}
-  Glosario:    {verdict: unjustified, by: [], note: "PENDIENTE DE DECISIÓN. Ninguna CQ lo sostiene. La única pregunta plausible (¿qué significa el término T?) exige leer prosa, así que no es CQ. La regla de corte lo dejaría fuera salvo decisión de diseño explícita"}
-  Playbook:    {verdict: split, by: [CQ-44], note: "PENDIENTE DE DECISIÓN. La investigación encontró preguntas que lo separan: CQ-44 lo trata como proceso reutilizable y CQ-34 como precedente archivado, con decision, frequency y answer_shape distintos. Son dos tipos. El nombre del segundo queda sin bautizar a propósito"}
+  Glosario:    {verdict: structural, by: [], decided: 2026-08-31, note: "RESUELTO: se queda, declarado estructural. Ninguna CQ lo sostiene y no declara campos requeridos, pero sirve leyéndolo, no consultándolo -- igual que Insumo e Indice. Cortarlo no simplificaba nada: OKF exige `type` en todo archivo de conocimiento, producción tiene 8, y ningún otro tipo aloja la definición de un término"}
+  Playbook:    {verdict: sustained, by: [CQ-44], decided: 2026-08-31, note: "RESUELTO: escindido. Se queda con el sentido de PROCESO reutilizable, que es como lo nombra CQ-44 y como lo usan los 23 documentos de producción. El corte: un Playbook se SIGUE, un Analisis se CONSULTA"}
+  Analisis:    {verdict: sustained, by: [CQ-34], decided: 2026-08-31, note: "La otra mitad de la escisión: el análisis archivado, que se consulta como precedente. Nombre elegido lejos de Informe, Entregable y Recurso, que son huecos aún sin bautizar. MIGRACIÓN: hay que triar a mano los 23 Playbook de producción; los `analisis-inicial.md` que crea /x-nueva-iniciativa son Analisis"}
 
 # Two entries carry PENDIENTE DE DECISIÓN because acting on them changes the
 # type catalogue, and the catalogue is what every brain in production already
@@ -591,11 +602,13 @@ corpus_reality_check:
 
 open_against_own_usage:
   note: >-
-    Lo que ninguna revisión de literatura puede sustituir, en orden de
-    prioridad. Es el cruce que decide qué CQ sobrevive.
+    Lo que ninguna revisión de literatura puede sustituir. CORREGIDO: esto se
+    escribió dando por hecho que existía un log de consultas de v1. No existe.
+    `log.md` registra escrituras, no preguntas, así que `frequency` no se puede
+    cerrar mirando atrás.
   items:
-    - "El log de uso real de v1 (+10.000 documentos): única fuente de conducta observada para este rol y este corpus. Fija las 9 `frequency` marcadas `# inferred`."
-    - "Umbral que cambia la decisión: una CQ inferida como mensual o esporádica sin ninguna consulta real en un trimestre se degrada o se corta."
-    - "Las preguntas que hoy se resuelven preguntando a un colega: la necesidad que nunca llega al sistema."
+    - "`frequency`: hay que instrumentarlo hacia adelante -- que los skills del paso 8 registren qué se consulta-- o aceptar las 9 marcas `# inferred` como lo que son."
+    - "Lo que `log.md` SÍ da: la cadencia de ingesta. Sirve para el punto flojo del veredicto del paso 0, que compara A por ingesta contra B por consulta con un cruce en 8,7."
+    - "Las preguntas que hoy se resuelven preguntando a un colega: la necesidad que nunca llega al sistema. Requiere observación, no telemetría."
     - "Las capacidades abandonadas: qué skills de v1 se dejaron de usar por inútiles."
     - "El etiquetado `asked_by` es tentativo: validar observando a esos roles, no extrapolando."

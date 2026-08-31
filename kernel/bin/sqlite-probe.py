@@ -79,8 +79,10 @@ def probe_sqlite():
         out["error"] = f"{type(exc).__name__}: {exc}"
         return out, None
     out["module"] = True
+    # `sqlite3.version` is the driver's own version, not the engine's. It was
+    # deprecated in 3.12 and REMOVED in 3.14, so reading it would crash on the
+    # newest interpreters -- and it never said anything useful anyway.
     out["sqlite_version"] = sqlite3.sqlite_version
-    out["driver_version"] = sqlite3.version
     out["threadsafety"] = sqlite3.threadsafety
     return out, sqlite3
 
@@ -249,7 +251,6 @@ def report(data):
         w(f"  módulo sqlite3            NO DISPONIBLE -- {sq.get('error')}")
     else:
         w(f"  versión de SQLite         {sq['sqlite_version']}")
-        w(f"  driver de Python          {sq['driver_version']}")
         w(f"  hilos (threadsafety)      {sq['threadsafety']}")
 
         w("\nCAPACIDADES")

@@ -11,7 +11,7 @@ Two invariants govern this file:
      so it can run in CI, on a hook, or a hundred times in a row.
   2. It has NO dependencies. Standard library only, Python 3.11+, so it runs
      with a stock interpreter in a locked-down environment. The binary
-     converter and the DuckDB projection are optional layers; this is not.
+     converter and the cut-2 SQLite projection are optional layers; this is not.
 
 Usage:
     brain.py validate [PATH] [--fix] [--json] [--full]
