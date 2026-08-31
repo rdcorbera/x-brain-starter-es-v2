@@ -15,7 +15,7 @@ La pendiente tiene dos componentes, con causas y remedios distintos:
 | | Qué pasa | Remedio |
 |---|---|---|
 | **Pendiente A** | `PREGUNTAS-ABIERTAS.md`, `ORGANIGRAMA.md` y cada `index.md` crecen con el cerebro, y v1 le pide al modelo **regenerarlos a mano** en cada ingesta — leer entero, reescribir entero. Ocho sitios del kernel lo ordenan; cuatro skills además los cargan completos en cada corrida | Generación determinista → **cero tokens** |
-| **Pendiente B** | Encontrar los documentos relevantes o afectados entre N navegando índices | Proyección consultable (DuckDB) → un `SELECT` en vez de leer índices |
+| **Pendiente B** | Encontrar los documentos relevantes o afectados entre N navegando índices | Proyección consultable (SQLite) → un `SELECT` en vez de leer índices |
 
 El detalle que lo delata: esos tres archivos se auto-declaran *"Autogenerado. No editar a mano"* — **y en v1 no existe ningún generador.** El vocabulario del sistema ya asumía la capa que faltaba.
 
@@ -42,7 +42,7 @@ De ahí el orden del trabajo: **el contrato primero, porque es la dependencia bl
 Sobre eso, v2 añade una capa determinista con dos invariantes:
 
 1. **Nunca llama a un LLM.** La extracción ocurre una vez, en la ingesta, con revisión humana. La validación, la generación y (en el corte 2) la proyección ocurren cuantas veces se quiera, gratis, y son reconstruibles.
-2. **No tiene dependencias.** Stdlib pura, Python 3.11+, sin `pip install`, en entornos restringidos. El piso lo fija lo que el código necesita —parseo ISO 8601 completo para `stale_after`— y no el intérprete que traiga el sistema; 3.9 y 3.10 además están fuera de soporte. `survey.py`, que es el preflight, se queda en 3.9 a propósito. El conversor de binarios y la proyección DuckDB son capas opcionales; esto no.
+2. **No tiene dependencias.** Stdlib pura, Python 3.11+, sin `pip install`, en entornos restringidos. El piso lo fija lo que el código necesita —parseo ISO 8601 completo para `stale_after`— y no el intérprete que traiga el sistema; 3.9 y 3.10 además están fuera de soporte. `survey.py`, que es el preflight, se queda en 3.9 a propósito. El conversor de binarios y la proyección SQLite del corte 2 son capas opcionales; esto no.
 
 ```
 kernel/schema/contract.json      ← EL CONTRATO. Fuente única.
@@ -52,7 +52,7 @@ kernel/schema/contract.json      ← EL CONTRATO. Fuente única.
         ├─→ cerebro/ESQUEMA.md                el esquema legible y portable
         ├─→ .claude/skills/ y .github/prompts/  ambos árboles de stubs
         ├─→ cerebro/index.md, PREGUNTAS-ABIERTAS.md, ORGANIGRAMA.md
-        └─→ (corte 2) el DDL de DuckDB
+        └─→ (corte 2) el DDL de SQLite
 ```
 
 Todo lo de la derecha es **generado**: no se edita, se regenera. Añadir un valor de enum es una línea en `contract.json`; en v1 era un grep manual sobre 15 archivos de prosa que rompía tres skills en silencio.
@@ -97,10 +97,27 @@ python3 kernel/bin/brain.py derive               # regenerar los índices deriva
 python3 kernel/bin/brain.py generate             # regenerar todos los artefactos
 
 python3 kernel/bin/survey.py cerebro           # medir dónde se van los tokens
+python3 kernel/bin/sqlite-probe.py .           # ¿puede esta máquina alojar la proyección?
 python3 kernel/tests/test_roundtrip.py         # generador y validador se comprueban entre sí
 ```
 
-`survey.py` es de solo lectura y no extrae contenido: reporta formas y conteos, así que su salida se puede compartir desde un entorno restringido.
+### Los dos preflight
+
+`survey.py` y `sqlite-probe.py` son distintos del resto: **su piso es Python 3.9, no 3.11**, porque corren en la máquina de destino *antes* de que se instale nada. Un preflight que depende de sus propios hallazgos no es un preflight. Los dos son de solo lectura y no extraen contenido de documentos.
+
+**`survey.py`** mide **dónde se van los tokens**: cuánto cuesta regenerar los índices derivados en cada ingesta frente a cuánto cuesta navegarlos en cada consulta. Reporta formas y conteos, así que su salida se puede compartir desde un entorno restringido. Sirve para decidir en qué orden atacar el problema, y para saber **cuándo toca el corte 2**: el disparador es su veredicto, o pasar de ~2.000 documentos.
+
+**`sqlite-probe.py`** responde si una máquina puede alojar la proyección del corte 2, y son tres preguntas, no una:
+
+| | |
+|---|---|
+| Qué SQLite hay | En Windows, Python empaqueta su propio `sqlite3.dll`, así que la versión la fija el intérprete y no el sistema |
+| Qué capacidades están compiladas | FTS5 es una **bandera de compilación, no una versión**: puede faltar en un SQLite reciente. Solo las CTE recursivas son bloqueantes |
+| Si la ruta elegida sirve | Tipo de unidad, detección de carpeta sincronizada, y **modo WAL como prueba decisiva** |
+
+Ese último punto es el que más veces se pasa por alto: **una carpeta sincronizada (OneDrive, Dropbox) o una unidad de red corrompen la base**, porque el cliente reescribe el archivo por debajo del proceso que lo tiene abierto. Y no basta con mirar si el disco es local: dentro de OneDrive, el disco *es* local y WAL activa sin problema. Solo lo detecta la comprobación explícita de sincronización. Sale con código 1 si la ruta no sirve, así que vale como paso de instalación.
+
+Ninguno escribe en el cerebro. La sonda crea una base de prueba en un directorio temporal bajo la ruta indicada y lo borra; y ninguna de las dos emite la ruta en su salida.
 
 ### Dos niveles de validación
 
@@ -115,11 +132,11 @@ Un `cerebro/` compartido sigue siendo OKF-válido aunque no cumpla nuestro perfi
 
 ## Estado
 
-**Hecho** — corte 1, en curso: el contrato con 13 tipos, el validador de 20 checks, la capa de gobierno de datos (clasificación, responsabilidad, aplicación en pre-commit y CI), el enrutamiento (`brain place`), la generación de plantillas, JSON Schemas, esquema portable, índices y derivados, el test de round-trip y el script de medición.
+**Hecho** — corte 1, en curso: el contrato con 14 tipos, el validador de 20 checks, la capa de gobierno de datos (clasificación, responsabilidad, aplicación en pre-commit y CI), el enrutamiento (`brain place`), la generación de plantillas, JSON Schemas, esquema portable, índices y derivados, el test de round-trip y el script de medición.
 
 **Siguiente** — corte 1: la prosa del kernel (que se escribe *al final*, porque solo se puede borrar una regla cuando ya existe el código que la sustituye), los skills reescritos para invocar `brain.py`, y la migración del cerebro en producción.
 
-**Corte 2**: la proyección DuckDB contra la Pendiente B. Su DDL se genera desde el mismo contrato, así que nada del corte 1 se desecha.
+**Corte 2**: la proyección SQLite contra la Pendiente B. Su DDL se genera desde el mismo contrato, así que nada del corte 1 se desecha.
 
 ## Cómo trabajamos en este repo
 
