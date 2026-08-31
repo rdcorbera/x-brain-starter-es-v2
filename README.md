@@ -132,7 +132,7 @@ Un `cerebro/` compartido sigue siendo OKF-válido aunque no cumpla nuestro perfi
 
 ## Estado
 
-**Hecho** — corte 1, en curso: el contrato con 13 tipos, el validador de 20 checks, la capa de gobierno de datos (clasificación, responsabilidad, aplicación en pre-commit y CI), el enrutamiento (`brain place`), la generación de plantillas, JSON Schemas, esquema portable, índices y derivados, el test de round-trip y el script de medición.
+**Hecho** — corte 1, en curso: el contrato con 14 tipos, el validador de 20 checks, la capa de gobierno de datos (clasificación, responsabilidad, aplicación en pre-commit y CI), el enrutamiento (`brain place`), la generación de plantillas, JSON Schemas, esquema portable, índices y derivados, el test de round-trip y el script de medición.
 
 **Siguiente** — corte 1: la prosa del kernel (que se escribe *al final*, porque solo se puede borrar una regla cuando ya existe el código que la sustituye), los skills reescritos para invocar `brain.py`, y la migración del cerebro en producción.
 
