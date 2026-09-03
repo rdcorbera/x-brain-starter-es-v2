@@ -257,7 +257,7 @@
       "location": ["01-proyectos/{proyecto}/00-insumos/"],
       "min_classification": "confidential",
       "governance_note": "External material whose content the system does not control. The raised floor forces a conscious declassification instead of assuming what arrived is harmless.",
-      "note": "Not hand-written: `a-markdown.py` emits it. Known v1 drift this contract now catches: .htm and .yml produced `formato: htm` / `formato: yml`, outside the enum.",
+      "note": "Not hand-written: `to-markdown.py` emits it. Known v1 drift this contract now catches: .htm and .yml produced `formato: htm` / `formato: yml`, outside the enum.",
       "fields": {
         "proyecto": { "data_type": "type-key", "to": "Iniciativa", "sentinels": ["transversal"], "required": true, "default": "transversal" },
         "formato": { "data_type": "enum", "values": ["pdf", "docx", "pptx", "xlsx", "html", "yaml"], "required": true },
