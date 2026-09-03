@@ -446,6 +446,7 @@ class Document:
 class Contract:
     def __init__(self, data: Dict[str, Any]) -> None:
         self.data = data
+        self.kernel: Optional[Path] = None
         self.okf_version = data.get("okf_version", "0.2")
         self.profile_version = data.get("profile_version", 1)
         self.common: Dict[str, Any] = data.get("common_fields", {})
@@ -536,6 +537,10 @@ class Contract:
     def load(cls, kernel_path: Path, bundle: Optional[Path] = None) -> "Contract":
         data = json.loads(kernel_path.read_text(encoding="utf-8"))
         contract = cls(data)
+        # Where this contract came from, so V14 can ask whether the artifacts it
+        # produces are still what is on disk. Without it the check could only be
+        # declared, which is what it was.
+        contract.kernel = kernel_path.parent.parent
         if bundle:
             user_path = bundle / USER_CONTRACT
             if user_path.exists():
@@ -790,6 +795,7 @@ class Validator:
         if only is None:
             self.check_indexes()
             self.check_derived()
+            self.check_generated()
         return sorted(
             self.findings,
             key=lambda f: (SEVERITY_ORDER[f.severity], f.check, f.path, f.line),
@@ -1044,6 +1050,46 @@ class Validator:
             elif path.read_text(encoding="utf-8").strip() != expected.strip():
                 self.add("V12", rel, "index.md desactualizado (auto-arreglable con --fix)")
 
+    def check_generated(self) -> None:
+        """The kernel's own artifacts still match what the contract produces.
+
+        `un artefacto generado no se edita, se regenera` is an invariant, and
+        until now nothing enforced it: V14 was declared in CHECKS and never
+        emitted, so a hand-edited template passed validation in silence. That is
+        the same defect as v1's `Autogenerado. No editar a mano` on files no
+        generator produced -- declared, not enforced.
+
+        Only the kernel's artifacts. The bundle's are V12 and V13; the
+        hand-written scaffold under kernel/scaffold/ is nobody's output.
+        """
+        kernel = self.contract.kernel
+        if kernel is None or not kernel.is_dir():
+            return
+        expected: Dict[Path, str] = {}
+        for type_name, spec in self.contract.types.items():
+            if spec.get("generated_only"):
+                continue
+            stem = type_name.lower()
+            expected[kernel / "schema" / "templates" / f"{stem}.md"] = (
+                GENERATED_MARK + "\n" + render_template(self.contract, type_name))
+            expected[kernel / "schema" / "json" / f"{stem}.schema.json"] = (
+                json.dumps(json_schema_for(self.contract, type_name), indent=2,
+                           ensure_ascii=False) + "\n")
+        for rel, content in build_stubs(kernel).items():
+            expected[kernel.parent / rel] = content
+
+        for path, content in sorted(expected.items()):
+            try:
+                rel = path.relative_to(kernel.parent).as_posix()
+            except ValueError:
+                rel = path.as_posix()
+            if not path.exists():
+                self.add("V14", rel, "artefacto generado ausente "
+                                     "(se repara con `brain.py generate`)")
+            elif path.read_text(encoding="utf-8") != content:
+                self.add("V14", rel, "artefacto generado desactualizado o editado a mano "
+                                     "(se repara con `brain.py generate`)")
+
     def check_derived(self) -> None:
         now = datetime.now().astimezone()   # aware: stale_after lleva zona
         for name, body in build_derived(self.contract, self.docs).items():
@@ -1114,10 +1160,19 @@ def resolve_locations(contract: Contract, type_name: str,
     return resolved, notes
 
 
-def location_patterns_for_match(contract: Contract, type_name: str) -> List[str]:
-    """Every pattern of the type, as a regex, for validating a real path."""
+def location_patterns_for_match(contract: Contract, type_name: str,
+                                role: Optional[str] = None) -> List[str]:
+    """Every pattern of the type, as a regex, for validating a real path.
+
+    `role` narrows to one kind of location. It is what lets a derived index say
+    "only the initiatives of the period in course" without anybody writing the
+    period down: an initiative leaves the current period by being MOVED to the
+    archive, and the contract already declares both places.
+    """
     out = []
     for entry in contract.locations(type_name):
+        if role is not None and entry.get("role", "active") != role:
+            continue
         path = entry["path"].rstrip("/")
         if path in ("", "."):
             out.append(r"^$")
@@ -1362,6 +1417,13 @@ def _cell(doc: Document, column: Dict[str, Any],
     return f"[{value}](/{doc.rel})" if column.get("link") else str(value)
 
 
+def _in_role(doc: Document, patterns: List[str]) -> bool:
+    """Does this document sit in one of the locations of a given role?"""
+    directory = str(Path(doc.rel).parent).replace("\\", "/")
+    directory = "" if directory == "." else directory
+    return any(re.match(p, directory) for p in patterns)
+
+
 def _matches(doc: Document, where: Dict[str, Any]) -> bool:
     for field, allowed in where.items():
         value = doc.meta.get(field)
@@ -1388,6 +1450,37 @@ def _render_table(spec: Dict[str, Any], rows: List[Document],
     if not rows:
         empty = spec.get("empty_row", "-")
         lines.append("| " + empty + " |" + " |" * (len(headers) - 1))
+    return lines
+
+
+def _render_groups(spec: Dict[str, Any], rows: List[Document],
+                   lookup: Dict[str, Document]) -> List[str]:
+    """One subsection per declared group -- GOALS.md's three blocks.
+
+    The groups are declared in order, so the enum that already exists is what
+    fixes the reading order; the engine still knows no type by name.
+
+    A row whose value matches no declared group is NEVER dropped: it lands in a
+    trailing section. Silently losing a document from a derived index is the
+    failure mode that makes people stop trusting the index and go back to
+    maintaining it by hand -- which is the cost this whole layer removes.
+    """
+    group_by = spec["group_by"]
+    field = group_by["field"]
+    lines: List[str] = []
+    claimed = set()
+    for group in group_by.get("groups", []):
+        value = group.get("value")
+        claimed.add(value)
+        members = [d for d in rows if d.meta.get(field) == value]
+        lines += ["", f"## {group.get('heading', value)}", ""]
+        if group.get("guide"):
+            lines += [group["guide"], ""]
+        lines += _render_table(spec, members, lookup)
+    orphans = [d for d in rows if d.meta.get(field) not in claimed]
+    if orphans:
+        lines += ["", f"## {group_by.get('other', 'Sin clasificar')}", ""]
+        lines += _render_table(spec, orphans, lookup)
     return lines
 
 
@@ -1434,6 +1527,10 @@ def build_derived(contract: Contract, docs: List[Document]) -> Dict[str, str]:
             continue      # declared so tooling knows it exists; not generable yet
         rows = [d for d in docs if d.type == spec["from"]
                 and _matches(d, spec.get("where", {}))]
+        if spec.get("from_role"):
+            patterns = location_patterns_for_match(contract, spec["from"],
+                                                   spec["from_role"])
+            rows = [d for d in rows if _in_role(d, patterns)]
 
         for key in reversed(spec.get("order_by", []) or []):
             field = key.get("field") if isinstance(key, dict) else str(key)
@@ -1445,6 +1542,8 @@ def build_derived(contract: Contract, docs: List[Document]) -> Dict[str, str]:
         body = ["", GENERATED_MARK, "", f"# {spec.get('heading', name)}", ""]
         if spec.get("render") == "mermaid-graph":
             body += _render_graph(spec, rows)
+        elif spec.get("group_by"):
+            body += _render_groups(spec, rows, lookup)
         else:
             body += _render_table(spec, rows, lookup)
         out[name] = "\n".join(body).rstrip() + "\n"
@@ -1823,9 +1922,24 @@ def require_bundle(path: Path) -> None:
         )
 
 
+def is_uninitialised(bundle: Path) -> bool:
+    """A brain with no knowledge in it at all -- not one that is incomplete.
+
+    The starter ships an empty cerebro/ on purpose, so this is the normal state
+    of a fresh clone. Reporting it as missing derived files would mean the
+    starter fails its own validator on day one, which is exactly the reading
+    `require_bundle` already refuses to give for a bundle that is not there.
+    """
+    return not any(bundle.rglob("*.md"))
+
+
 def cmd_validate(args) -> int:
     bundle = Path(args.path)
     require_bundle(bundle)
+    if is_uninitialised(bundle) and not args.staged:
+        print(f"\nbrain validate {bundle}: cerebro sin inicializar.\n"
+              f"       Córrelo con `brain.py init {bundle}` y vuelve a validar.\n")
+        return 0
     contract = Contract.load(Path(args.contract), bundle)
 
     only = staged_paths(bundle) if args.staged else None
@@ -2005,7 +2119,7 @@ def cmd_index(args) -> int:
 
 
 def cmd_derive(args) -> int:
-    bundle = Path(args.bundle)
+    bundle = Path(args.path)
     contract = Contract.load(Path(args.contract), bundle)
     validator = Validator(contract, bundle)
     validator.collect()
@@ -2046,24 +2160,89 @@ def cmd_generate(args) -> int:
                             schema):
             print(f"wrote  kernel/schema/json/{type_name.lower()}.schema.json")
 
-    # The portable schema lives in the bundle, not the kernel: it is what makes
-    # a shared cerebro/ readable without the system that produced it.
-    bundle = Path(args.bundle)
-    rel = contract.data.get("bundle_schema", {}).get("path", "ESQUEMA.md")
-    if bundle.is_dir():
-        body = render_bundle_schema(contract)
-        # Compare bodies, never whole files: the frontmatter carries a
-        # generation timestamp, so a full comparison would rewrite it on every
-        # run and produce a spurious diff in every user's repo. Same rule the
-        # derived files already followed -- this one had been missed.
-        if not derived_is_current(bundle / rel, body):
-            write_if_changed(bundle / rel,
-                             bundle_schema_frontmatter(contract) + body)
-            print(f"wrote  {bundle / rel}")
-    else:
-        print(f"nota   sin {bundle}/ en este repositorio; se omite {rel}")
-
+    # The bundle is NOT written here. `generate` produces the kernel's own
+    # artifacts -- what CI checks is up to date -- while materialising a brain
+    # is an act of setup and belongs to `init`. Mixing them meant the starter,
+    # which ships an empty cerebro/ by design, grew an ESQUEMA.md on every run.
     cmd_stubs(args)
+    return 0
+
+
+def write_bundle_schema(contract: Contract, bundle: Path) -> bool:
+    """The portable schema, inside the bundle.
+
+    It is what makes a shared cerebro/ readable without the system that produced
+    it. Compared by BODY, never whole file: the frontmatter carries a generation
+    timestamp, so a full comparison would rewrite it on every run and produce a
+    spurious diff in every user's repo.
+    """
+    rel = contract.data.get("bundle_schema", {}).get("path", "ESQUEMA.md")
+    body = render_bundle_schema(contract)
+    if derived_is_current(bundle / rel, body):
+        return False
+    write_if_changed(bundle / rel, bundle_schema_frontmatter(contract) + body)
+    return True
+
+
+def cmd_init(args) -> int:
+    """Materialise a brain: the deterministic half of the setup.
+
+    Everything here is derivable from the contract, so it costs zero tokens and
+    is safe to re-run -- after a kernel update it is how ESQUEMA.md and the
+    derived indexes catch up. What it deliberately does NOT do is fill anything
+    in: the interview is /x-setup's job. Structure is mechanical, context is not.
+    """
+    bundle = Path(args.path)
+    contract = Contract.load(Path(args.contract), bundle)
+    kernel = Path(args.contract).parent.parent
+    wrote = 0
+
+    bundle.mkdir(parents=True, exist_ok=True)
+    # The PARA folders come from the same block that documents them in
+    # ESQUEMA.md, so the tree and its explanation cannot drift apart. A .gitkeep
+    # each, because git does not track an empty directory and the skeleton is
+    # the part a new brain most needs to survive its first clone.
+    for rel in contract.data.get("bundle_schema", {}).get("structure", {}):
+        (bundle / rel).mkdir(parents=True, exist_ok=True)
+        keep = bundle / rel / ".gitkeep"
+        if not keep.exists():
+            write_text_lf(keep, "")
+    # personas/ is named by the organigrama's own declared path, so the folder
+    # the derived file needs exists before anything tries to write into it.
+    for name in contract.derived:
+        parent = (bundle / name).parent
+        if parent != bundle:
+            parent.mkdir(parents=True, exist_ok=True)
+
+    for source in sorted((kernel / "scaffold").glob("*.md")):
+        target = bundle / source.name
+        if target.exists():
+            continue          # never overwrite what a person filled in
+        write_if_changed(target, source.read_text(encoding="utf-8"))
+        print(f"wrote  {source.name}")
+        wrote += 1
+
+    if write_bundle_schema(contract, bundle):
+        print(f"wrote  {contract.data.get('bundle_schema', {}).get('path')}")
+        wrote += 1
+
+    validator = Validator(contract, bundle)
+    validator.collect()
+    for name, body in build_derived(contract, validator.docs).items():
+        if not derived_is_current(bundle / name, body):
+            write_if_changed(bundle / name, compose_derived(contract, name, body))
+            print(f"wrote  {name}")
+            wrote += 1
+    # Indexes last: they list the files the steps above just created.
+    validator = Validator(contract, bundle)
+    validator.collect()
+    for directory, content in build_indexes(contract, validator.docs, bundle).items():
+        if write_if_changed(directory / "index.md", content):
+            print(f"wrote  {(directory / 'index.md').relative_to(bundle)}")
+            wrote += 1
+
+    if not wrote:
+        print(f"brain init {bundle}: ya estaba al día.")
     return 0
 
 
@@ -2103,7 +2282,12 @@ def main() -> int:
     p.add_argument("path", nargs="?", default=str(DEFAULT_BUNDLE))
     p.set_defaults(func=cmd_index)
 
+    p = sub.add_parser("init", help="materializar un cerebro (estructura y derivados)")
+    p.add_argument("path", nargs="?", default=str(DEFAULT_BUNDLE))
+    p.set_defaults(func=cmd_init)
+
     p = sub.add_parser("derive", help="regenerar los índices derivados")
+    p.add_argument("path", nargs="?", default=str(DEFAULT_BUNDLE))
     p.set_defaults(func=cmd_derive)
 
     p = sub.add_parser("stubs", help="generar los stubs de ambas herramientas")

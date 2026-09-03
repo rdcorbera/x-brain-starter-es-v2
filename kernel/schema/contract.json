@@ -27,9 +27,10 @@
   },
   "governance": {
     "note": "Makes this contract a governed artifact rather than a file someone edits. Governance that lives only in prose is what v1 had, and it enforced nothing.",
-    "steward": "<TODO: /x-setup -- who answers for this contract>",
+    "steward": "El dueño del cerebro, declarado en cerebro/PERFIL.md. Del contrato base responde quien mantiene el starter.",
+    "steward_note": "Spanish because `governance_report` renders it to a person, per language_policy -- same rule as `review_cadence`. It was a `<TODO: /x-setup>` placeholder, which meant the posture report of a governed artifact answered 'who is responsible' with a TODO. It names a ROLE and not a person on purpose: this file ships in a public starter, and the individual varies per install.",
     "change_process": "A contract change is a PR to the starter, never a local edit. Bump `profile_version` when tightening a constraint. No type enters without a competency question that needs it.",
-    "review_cadence": "Once per planning period, alongside /x-cierre-periodo.",
+    "review_cadence": "Una vez por periodo de planificación, junto con /x-cierre-periodo.",
     "enforcement": "`brain.py validate` on pre-commit (only what changes) and in CI (the whole bundle). A control nobody runs is not a control."
   },
   "language_policy": {
@@ -512,6 +513,32 @@
       "from": "Plan",
       "deferred": "No se genera todavía: sus filas viven DENTRO del PLAN.md como tabla markdown, y este generador solo sabe seleccionar documentos y renderizar su frontmatter. Declararlo igual porque `survey.py` lo cuenta para medir la Pendiente A, que con este archivo pasa de dos derivados a tres. Generarlo exige extender `sections` con tipos de columna -- decisión de diseño aparte, es la frontera con el corte 3.",
       "note": "Introducido por el kernel 1.4.0 de v1. Su sección «Sin proyecto» además agrega los pendientes de las fichas Persona, así que tiene DOS fuentes: otra cosa que el esquema actual de derived_files no expresa."
+    },
+    "GOALS.md": {
+      "type": "Indice",
+      "title": "Objetivos del periodo",
+      "description": "Los objetivos del periodo en curso, agrupados por origen.",
+      "heading": "Objetivos del periodo",
+      "from": "Iniciativa",
+      "from_role": "active",
+      "render": "table",
+      "group_by": {
+        "field": "origen",
+        "other": "Sin origen declarado",
+        "groups": [
+          { "value": "proyecto-asignado", "heading": "Proyectos asignados" },
+          { "value": "objetivo-personal", "heading": "Objetivos personales" },
+          { "value": "objetivo-equipo", "heading": "Objetivos del equipo o área" }
+        ]
+      },
+      "order_by": [{ "field": "estado" }, { "field": "proyecto" }],
+      "empty_row": "_ninguno_",
+      "columns": [
+        { "header": "Objetivo", "value": "title", "link": true },
+        { "header": "Periodo", "value": "periodo" },
+        { "header": "Estado", "value": "estado" }
+      ],
+      "note": "v1 shipped this as a hand-written Playbook whose three blocks the model rewrote on every /x-nueva-iniciativa and every /x-actualizacion-semanal -- Slope A in a file the survey never counted. It needs no new type: `Iniciativa.origen` is already an enum of exactly those three blocks, and v1's own module says so (`el origen define a qué bloque de GOALS.md se engancha`). `from_role: active` is what makes 'the period in course' derivable without writing the period down: an initiative leaves it by being moved to the archive, and both locations are already declared."
     },
     "02-areas/personas/ORGANIGRAMA.md": {
       "type": "Diagrama",

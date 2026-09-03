@@ -16,11 +16,14 @@ Stdlib only. Run from the repo root:
 from __future__ import annotations
 
 import importlib.util
+import io
 import re
 import shutil
 import sys
 import tempfile
+from contextlib import redirect_stdout
 from pathlib import Path
+from types import SimpleNamespace
 from typing import List
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -144,6 +147,92 @@ def check_locations(contract) -> List[str]:
     return problems
 
 
+def check_derived_specs(contract) -> List[str]:
+    """A derived index must select and group by things that actually exist.
+
+    `GOALS.md` groups Iniciativa by `origen`, and the whole point of deriving it
+    is that nobody maintains it. If a group value drifts from the enum, the
+    documents in it disappear from the index in silence -- and a derived file
+    people cannot trust is worse than the hand-written one it replaced.
+    """
+    problems = []
+    for name, spec in contract.derived.items():
+        if not isinstance(spec, dict) or not spec.get("from"):
+            continue
+        source = spec["from"]
+        if source not in contract.types:
+            problems.append(f"{name}: `from` es `{source}`, que no está en el catálogo")
+            continue
+        fields = contract.fields_for(source)
+
+        role = spec.get("from_role")
+        if role is not None:
+            roles = {e.get("role", "active") for e in contract.locations(source)}
+            if role not in roles:
+                problems.append(
+                    f"{name}: `from_role: {role}` y {source} no declara ninguna "
+                    f"ubicación con ese rol (tiene: {', '.join(sorted(roles)) or 'ninguna'})")
+
+        group_by = spec.get("group_by")
+        if not group_by:
+            continue
+        field = group_by.get("field")
+        if field not in fields:
+            problems.append(f"{name}: agrupa por `{field}`, que {source} no declara")
+            continue
+        allowed = fields[field].get("values")
+        for group in group_by.get("groups", []):
+            value = group.get("value")
+            if allowed and value not in allowed:
+                problems.append(
+                    f"{name}: el grupo `{value}` no es un valor de {source}.{field} "
+                    f"({' | '.join(allowed)})")
+        if allowed:
+            covered = {g.get("value") for g in group_by.get("groups", [])}
+            missing = [v for v in allowed if v not in covered]
+            if missing and not group_by.get("other"):
+                problems.append(
+                    f"{name}: no cubre {', '.join(missing)} y no declara `other`, "
+                    "así que esos documentos no saldrían en ningún bloque")
+    return problems
+
+
+def check_init(contract) -> List[str]:
+    """`brain init` produces a bundle that passes its own validator, twice.
+
+    The starter ships an empty cerebro/ on purpose, so `init` is what every user
+    runs first. If its output does not validate, the very first thing a new
+    brain reports is a defect in itself.
+    """
+    problems = []
+    tmp = Path(tempfile.mkdtemp(prefix="brain-init-"))
+    try:
+        args = SimpleNamespace(
+            path=str(tmp / "cerebro"),
+            contract=str(ROOT / "kernel" / "schema" / "contract.json"))
+        with redirect_stdout(io.StringIO()):
+            brain.cmd_init(args)
+        bundle = Path(args.path)
+
+        before = {p: p.read_bytes() for p in sorted(bundle.rglob("*")) if p.is_file()}
+        with redirect_stdout(io.StringIO()):
+            brain.cmd_init(args)
+        after = {p: p.read_bytes() for p in sorted(bundle.rglob("*")) if p.is_file()}
+        for path in sorted(set(before) | set(after)):
+            if before.get(path) != after.get(path):
+                problems.append(
+                    f"init no es idempotente: `{path.name}` cambia en la segunda corrida")
+
+        findings = brain.Validator(contract, bundle).run()
+        for f in findings:
+            if f.severity == brain.ERROR:
+                problems.append(f"init deja un cerebro que no valida: "
+                                f"{f.path}: [{f.check}] {f.message}")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return problems
+
+
 def check_yaml_compatibility(contract) -> List[str]:
     """Every generated template must open in a real YAML parser.
 
@@ -189,7 +278,8 @@ def main() -> int:
     contract = brain.Contract.load(ROOT / "kernel" / "schema" / "contract.json")
     tmp = Path(tempfile.mkdtemp(prefix="brain-roundtrip-"))
     failures = (check_provenance(contract) + check_yaml_compatibility(contract)
-                + check_locations(contract))
+                + check_locations(contract) + check_derived_specs(contract)
+                + check_init(contract))
 
     try:
         (tmp / "02-areas" / "personas").mkdir(parents=True)
@@ -224,8 +314,9 @@ def main() -> int:
               "archivo. En cualquier caso, uno de los dos está mal.")
         return 1
 
-    print(f"OK -- provenance completo, y las plantillas de los {len(tested)} tipos, "
-          "rellenadas, validan limpio.")
+    print(f"OK -- provenance completo, derivados consistentes, `init` idempotente y "
+          f"validando, y las plantillas de los {len(tested)} tipos, rellenadas, "
+          "validan limpio.")
     return 0
 
 

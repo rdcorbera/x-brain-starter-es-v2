@@ -43,6 +43,14 @@ jobs:
           git diff --exit-code -- kernel/schema .claude .github/prompts \
             || { echo "::error::Hay artefactos generados desactualizados. Corre 'brain.py generate' y commitea."; exit 1; }
 
+      # `generate` NO debe tocar el bundle: materializar un cerebro es `init`, y
+      # el starter versiona un cerebro/ vacío a propósito. Si esto falla, la
+      # separación se rompió y el repo del usuario recibiría un diff espurio.
+      - name: "`generate` no escribe dentro del cerebro"
+        run: |
+          git diff --exit-code -- cerebro \
+            || { echo "::error::'brain.py generate' escribió dentro de cerebro/. Eso es trabajo de 'init'."; exit 1; }
+
       - name: Round-trip -- generador y validador se comprueban entre sí
         run: python kernel/tests/test_roundtrip.py
 
@@ -63,15 +71,25 @@ jobs:
       - name: Sonda SQLite -- ¿sigue siendo viable la proyección del corte 2?
         run: python kernel/bin/sqlite-probe.py "$(python -c 'import tempfile;print(tempfile.mkdtemp())')"
 
-      - name: Validar el bundle
+      # El cerebro del starter está vacío a propósito, así que validarlo aquí no
+      # probaría nada. Lo que sí hay que probar es lo que le pasa al usuario:
+      # `init` es lo primero que corre, y su salida tiene que validar limpio. Si
+      # no, lo primero que un cerebro nuevo reporta es un defecto en sí mismo.
+      - name: Un cerebro recién inicializado valida limpio
         run: |
-          if [ ! -d cerebro ]; then
-            echo "::notice::Sin cerebro/ en este repositorio (es un starter). Se omite."
+          destino="$(python -c 'import tempfile;print(tempfile.mkdtemp())')/cerebro"
+          python kernel/bin/brain.py init "$destino"
+          python kernel/bin/brain.py validate "$destino"
+          python kernel/bin/brain.py govern "$destino"
+
+      # Y si este repositorio SÍ tiene conocimiento (el de un usuario, no el
+      # starter), se valida entero: es donde se ven los índices y derivados
+      # desincronizados, que el pre-commit no puede ver.
+      - name: Validar el bundle, si tiene contenido
+        run: |
+          if ! ls cerebro/*.md >/dev/null 2>&1; then
+            echo "::notice::cerebro/ vacío (es el starter). Se omite."
             exit 0
           fi
           python kernel/bin/brain.py validate cerebro
-
-      - name: Postura de gobierno de datos
-        if: always()
-        run: |
-          [ -d cerebro ] && python kernel/bin/brain.py govern cerebro || true
+          python kernel/bin/brain.py govern cerebro

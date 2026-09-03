@@ -14,7 +14,7 @@ La pendiente tiene dos componentes, con causas y remedios distintos:
 
 | | Qué pasa | Remedio |
 |---|---|---|
-| **Pendiente A** | `PREGUNTAS-ABIERTAS.md`, `ORGANIGRAMA.md` y cada `index.md` crecen con el cerebro, y v1 le pide al modelo **regenerarlos a mano** en cada ingesta — leer entero, reescribir entero. Ocho sitios del kernel lo ordenan; cuatro skills además los cargan completos en cada corrida | Generación determinista → **cero tokens** |
+| **Pendiente A** | `PREGUNTAS-ABIERTAS.md`, `ORGANIGRAMA.md`, `GOALS.md` y cada `index.md` crecen con el cerebro, y v1 le pide al modelo **regenerarlos a mano** en cada ingesta — leer entero, reescribir entero. Ocho sitios del kernel lo ordenan; cuatro skills además los cargan completos en cada corrida | Generación determinista → **cero tokens** |
 | **Pendiente B** | Encontrar los documentos relevantes o afectados entre N navegando índices | Proyección consultable (SQLite) → un `SELECT` en vez de leer índices |
 
 El detalle que lo delata: esos tres archivos se auto-declaran *"Autogenerado. No editar a mano"* — **y en v1 no existe ningún generador.** El vocabulario del sistema ya asumía la capa que faltaba.
@@ -42,26 +42,32 @@ De ahí el orden del trabajo: **el contrato primero, porque es la dependencia bl
 Sobre eso, v2 añade una capa determinista con dos invariantes:
 
 1. **Nunca llama a un LLM.** La extracción ocurre una vez, en la ingesta, con revisión humana. La validación, la generación y (en el corte 2) la proyección ocurren cuantas veces se quiera, gratis, y son reconstruibles.
-2. **No tiene dependencias.** Stdlib pura, Python 3.11+, sin `pip install`, en entornos restringidos. El piso lo fija lo que el código necesita —parseo ISO 8601 completo para `stale_after`— y no el intérprete que traiga el sistema; 3.9 y 3.10 además están fuera de soporte. `survey.py`, que es el preflight, se queda en 3.9 a propósito. El conversor de binarios y la proyección SQLite del corte 2 son capas opcionales; esto no.
+2. **No tiene dependencias.** Stdlib pura, Python 3.11+, sin `pip install`, en entornos restringidos. El piso lo fija lo que el código necesita —parseo ISO 8601 completo para `stale_after`— y no el intérprete que traiga el sistema; 3.9 y 3.10 además están fuera de soporte. `survey.py` y `sqlite-probe.py`, que son los preflight, se quedan en 3.9 a propósito. **El conversor de insumos también es stdlib pura** — su única excepción es la extracción de PDF, y degrada con aviso. La proyección SQLite del corte 2 va sobre `sqlite3`, que también es stdlib.
 
 ```
 kernel/schema/contract.json      ← EL CONTRATO. Fuente única.
         │
-        ├─→ kernel/schema/templates/*.md      plantillas por tipo
-        ├─→ kernel/schema/json/*.schema.json  JSON Schema, para tooling estándar
-        ├─→ cerebro/ESQUEMA.md                el esquema legible y portable
-        ├─→ .claude/skills/ y .github/prompts/  ambos árboles de stubs
-        ├─→ cerebro/index.md, PREGUNTAS-ABIERTAS.md, ORGANIGRAMA.md
-        └─→ (corte 2) el DDL de SQLite
+        ├─ brain generate ─→ kernel/schema/templates/*.md      plantillas por tipo
+        │                 ─→ kernel/schema/json/*.schema.json  JSON Schema, para tooling estándar
+        │                 ─→ .claude/skills/ y .github/prompts/  ambos árboles de stubs
+        │
+        ├─ brain init ────→ cerebro/ESQUEMA.md   el esquema legible y portable
+        │                 ─→ la estructura PARA del cerebro
+        │
+        ├─ brain index ───→ cerebro/**/index.md
+        ├─ brain derive ──→ PREGUNTAS-ABIERTAS.md, GOALS.md, ORGANIGRAMA.md
+        └─ (corte 2) ─────→ el DDL de SQLite
 ```
 
-Todo lo de la derecha es **generado**: no se edita, se regenera. Añadir un valor de enum es una línea en `contract.json`; en v1 era un grep manual sobre 15 archivos de prosa que rompía tres skills en silencio.
+Todo lo de la derecha es **generado**: no se edita, se regenera — y **V14 lo comprueba**. Añadir un valor de enum es una línea en `contract.json`; en v1 era un grep manual sobre 15 archivos de prosa que rompía tres skills en silencio.
+
+**`generate` produce los artefactos del kernel; `init` materializa un cerebro.** La separación importa: este starter versiona un `cerebro/` **vacío a propósito** —nunca contiene conocimiento— así que generar no puede escribir dentro de él.
 
 ## Gobierno de datos
 
 La política que no se ejecuta no es un control. v1 tenía **más** reglas de gobierno que v2 —todas en prosa dentro de `AGENTS.md`— y ninguna aplicaba nada. v2 tiene menos, pero son ejecutables.
 
-**Clasificación.** Cuatro niveles —`publico`, `interno`, `confidencial`, `restringido`— y un **mínimo por tipo**. `Persona` no puede bajar de `confidencial` porque contiene dato personal, e `Insumo` tampoco porque es material externo cuyo contenido el sistema no controla. La ausencia de clasificación es un aviso mientras el corpus migra; **estar por debajo del mínimo es siempre un error**, y es el único control que no se relaja durante la migración.
+**Clasificación.** Cuatro niveles —`public`, `internal`, `confidential`, `restricted`— y un **mínimo por tipo**. `Persona` no puede bajar de `confidential` porque contiene dato personal, e `Insumo` tampoco porque es material externo cuyo contenido el sistema no controla. La ausencia de clasificación es un aviso mientras el corpus migra; **estar por debajo del mínimo es siempre un error**, y es el único control que no se relaja durante la migración.
 
 **Responsabilidad.** `dueño`, `responsable` y `fuente` son `person-ref`: aceptan un enlace a una ficha `Persona` —que se verifica— o un nombre en texto libre, que se tolera y se reporta hasta resolverse. Así la propiedad se vuelve consultable de forma progresiva en vez de tras un muro de errores.
 
@@ -88,18 +94,26 @@ python3 kernel/bin/brain.py place Reunion proyecto=2026-q3-erp
 ```
 
 ```bash
+python3 kernel/bin/brain.py init cerebro         # materializar (o poner al día) un cerebro
 python3 kernel/bin/brain.py validate cerebro     # validar (dos niveles: OKF / perfil)
 python3 kernel/bin/brain.py validate --fix       # arreglar solo lo mecánico
 python3 kernel/bin/brain.py validate --staged    # solo lo que se commitea
 python3 kernel/bin/brain.py template Reunion     # imprimir una plantilla
 python3 kernel/bin/brain.py index                # regenerar los index.md
 python3 kernel/bin/brain.py derive               # regenerar los índices derivados
-python3 kernel/bin/brain.py generate             # regenerar todos los artefactos
+python3 kernel/bin/brain.py generate             # regenerar los artefactos del kernel
 
+python3 kernel/bin/to-markdown.py <archivo>     # insumo binario → markdown, sin dependencias
 python3 kernel/bin/survey.py cerebro           # medir dónde se van los tokens
 python3 kernel/bin/sqlite-probe.py .           # ¿puede esta máquina alojar la proyección?
 python3 kernel/tests/test_roundtrip.py         # generador y validador se comprueban entre sí
 ```
+
+### Insumos binarios sin `pip`
+
+El inbox recibe `.pdf`, `.docx`, `.pptx`, `.xlsx`, `.drawio`, `.html` y `.yaml`, y ningún agente abre un binario: lo convierte y lee el `.md`. **`to-markdown.py` es stdlib pura** — los formatos de Office son ZIP + XML y `.drawio` es XML, así que nada de eso necesitaba una dependencia. v1 pasaba por `markitdown` dentro de un `.venv` hermano, que en un entorno con `pip` restringido convierte el conversor en el eslabón que no se puede instalar.
+
+**El `.pdf` es la única excepción** y degrada con aviso en vez de fallar: un PDF es un contenedor binario con flujos comprimidos, y sacar texto de ahí sin librería no es razonable. Lo que emite el conversor es un `Insumo` que ya valida contra el contrato, con su `generated: {by: process:to-markdown}` — así «esto lo produjo un script y nadie lo ha revisado» es consultable.
 
 ### Los dos preflight
 
@@ -132,12 +146,18 @@ Un `cerebro/` compartido sigue siendo OKF-válido aunque no cumpla nuestro perfi
 
 ## Estado
 
-**Hecho** — corte 1, en curso: el contrato con 14 tipos, el validador de 20 checks, la capa de gobierno de datos (clasificación, responsabilidad, aplicación en pre-commit y CI), el enrutamiento (`brain place`), la generación de plantillas, JSON Schemas, esquema portable, índices y derivados, el test de round-trip y el script de medición.
+**Hecho** — corte 1: el contrato con 14 tipos, el validador de 20 checks, la capa de gobierno de datos (clasificación, responsabilidad, aplicación en pre-commit y CI), el enrutamiento (`brain place`), la generación de plantillas, JSON Schemas, esquema portable, índices y derivados, `brain init`, el conversor de insumos sin dependencias, el test de round-trip y los dos preflight. **Y la prosa del kernel** — `AGENTS.md`, la guía de uso, la instalación y el changelog—, escrita al final y contra un inventario regla por regla de v1: cada regla que desapareció nombra el comando que la sustituye.
 
-**Siguiente** — corte 1: la prosa del kernel (que se escribe *al final*, porque solo se puede borrar una regla cuando ya existe el código que la sustituye), los skills reescritos para invocar `brain.py`, y la migración del cerebro en producción.
+**Siguiente** — corte 1: los skills reescritos para invocar `brain.py`, y la migración del cerebro en producción.
 
 **Corte 2**: la proyección SQLite contra la Pendiente B. Su DDL se genera desde el mismo contrato, así que nada del corte 1 se desecha.
 
-## Cómo trabajamos en este repo
+## Documentación
 
-Las reglas, convenciones y la bitácora de decisiones están en [CLAUDE.md](CLAUDE.md).
+| | |
+|---|---|
+| [INSTALL.md](INSTALL.md) | Instalar, de cero a un cerebro que funciona |
+| [kernel/GUIA-DE-USO.md](kernel/GUIA-DE-USO.md) | Operarlo día a día |
+| [kernel/AGENTS.md](kernel/AGENTS.md) | Las reglas que siguen los agentes |
+| [kernel/CHANGELOG.md](kernel/CHANGELOG.md) | Qué cambió en cada versión, y cómo migrar |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Cómo se **construye** este sistema — reglas de trabajo e invariantes |
