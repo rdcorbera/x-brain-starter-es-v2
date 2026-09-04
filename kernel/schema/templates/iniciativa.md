@@ -8,7 +8,7 @@ classification: internal          # mínimo de Iniciativa: internal
 generated: {by: <by>, at: <at>}
 proyecto: <slug de la carpeta, ej. 2026-q3-migracion-erp>
 origen: proyecto-asignado          # proyecto-asignado | objetivo-personal | objetivo-equipo
-periodo: <según el formato de PERFIL.md, ej. 2026-Q3>
+periodo: <según el formato declarado, ej. 2026-Q3>
 estado: iniciando          # iniciando | en-progreso | bloqueada | entregada
 ---
 

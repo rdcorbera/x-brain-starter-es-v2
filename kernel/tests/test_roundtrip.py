@@ -274,12 +274,69 @@ def check_yaml_compatibility(contract) -> List[str]:
     return problems
 
 
+def check_period_formats(contract) -> List[str]:
+    """The period shapes, and the user declaration that selects one.
+
+    V14 shipped declared and dead for a whole cut because nothing exercised it.
+    V21 gets its test in the same commit as its code: each shape must accept its
+    own documented example and reject the other two, the undeclared brain must
+    accept all three, and every wrong declaration must be refused rather than
+    ignored -- a config typo that quietly does nothing is what V21 exists to end.
+    """
+    problems = []
+    shapes = contract.period_formats.get("shapes", {})
+    if not shapes:
+        return ["el contrato no declara `period_formats.shapes`"]
+
+    examples = {n: s["example"] for n, s in shapes.items()}
+    for name, spec in shapes.items():
+        pattern = spec["pattern"]
+        if not re.match(pattern, spec["example"]):
+            problems.append(
+                f"period_formats.{name}: su propio ejemplo `{spec['example']}` "
+                "no casa con su patrón")
+        for other, example in examples.items():
+            if other != name and re.match(pattern, example):
+                problems.append(
+                    f"period_formats.{name}: acepta `{example}`, que es el "
+                    f"ejemplo de `{other}` -- las formas deben ser disjuntas")
+
+    # Values the prose used to allow because `periodo` was an unchecked text field.
+    for junk in ("2026-q3", "Q3-2026", "tercer trimestre", "T3", "2026-8", "2026-S4"):
+        for name, spec in shapes.items():
+            if re.match(spec["pattern"], junk):
+                problems.append(f"period_formats.{name}: acepta `{junk}`")
+
+    base = ROOT / "kernel" / "schema" / "contract.json"
+    undeclared = brain.Contract.load(base)
+    if len(undeclared.period_patterns()) != len(shapes):
+        problems.append("sin declarar, period_patterns() no ofrece todas las formas")
+
+    for name in shapes:
+        c = brain.Contract.load(base)
+        c.merge_user({"period_format": name})
+        got = [n for n, _ in c.period_patterns()]
+        if got != [name]:
+            problems.append(f"declarado `{name}`, period_patterns() dio {got}")
+
+    for bad in ({"period_format": "trimestral"}, {"periodo_format": "monthly"},
+                {"types": {"Reunion": {}}}):
+        c = brain.Contract.load(base)
+        try:
+            c.merge_user(bad)
+        except SystemExit:
+            continue
+        problems.append(f"{bad} debía ser rechazado por merge_user y pasó")
+
+    return problems
+
+
 def main() -> int:
     contract = brain.Contract.load(ROOT / "kernel" / "schema" / "contract.json")
     tmp = Path(tempfile.mkdtemp(prefix="brain-roundtrip-"))
     failures = (check_provenance(contract) + check_yaml_compatibility(contract)
                 + check_locations(contract) + check_derived_specs(contract)
-                + check_init(contract))
+                + check_period_formats(contract) + check_init(contract))
 
     try:
         (tmp / "02-areas" / "personas").mkdir(parents=True)
@@ -314,9 +371,9 @@ def main() -> int:
               "archivo. En cualquier caso, uno de los dos está mal.")
         return 1
 
-    print(f"OK -- provenance completo, derivados consistentes, `init` idempotente y "
-          f"validando, y las plantillas de los {len(tested)} tipos, rellenadas, "
-          "validan limpio.")
+    print(f"OK -- provenance completo, derivados consistentes, formas de periodo "
+          f"disjuntas, `init` idempotente y validando, y las plantillas de los "
+          f"{len(tested)} tipos, rellenadas, validan limpio.")
     return 0
 
 

@@ -465,6 +465,9 @@ class Contract:
             k for k in data.get("exempt_files", {}) if k != "note"
         }
         self.governance: Dict[str, Any] = data.get("governance", {})
+        self.user_contract: Dict[str, Any] = data.get("user_contract", {})
+        self.period_formats: Dict[str, Any] = data.get("period_formats", {})
+        self.period_format: Optional[str] = None   # set by merge_user
         self.classification: Dict[str, Any] = data.get("classification", {})
         self.levels: List[str] = [
             lv["value"] for lv in self.classification.get("levels", [])
@@ -548,14 +551,71 @@ class Contract:
         return contract
 
     def merge_user(self, user: Dict[str, Any]) -> None:
-        """User types are ADDED. Base types can be neither overridden nor removed."""
-        for name, spec in user.get("types", {}).items():
-            if name in self.types:
+        """Apply cerebro/schema.json, dispatching on what the contract declares.
+
+        The accepted keys and their `mode` live in the contract's `user_contract`
+        block, so the next user-settable knob costs a contract edit and not a
+        code change. An undeclared key is refused rather than ignored: a typo in
+        a config file that quietly does nothing is the exact failure this block
+        exists to remove.
+        """
+        declared = self.user_contract.get("keys", {})
+        for key, value in user.items():
+            if key == "note":
+                continue
+            spec = declared.get(key)
+            if spec is None:
+                accepted = ", ".join(f"`{k}`" for k in sorted(declared))
+                raise SystemExit(
+                    f"error: {USER_CONTRACT} declara `{key}`, que el contrato no acepta. "
+                    f"Claves admitidas: {accepted}."
+                )
+            mode = spec.get("mode")
+            if mode == "add":
+                self._merge_add(key, value)
+            elif mode == "choose":
+                self._merge_choose(key, value, spec)
+            else:
+                raise SystemExit(
+                    f"error: el contrato declara `{key}` con mode `{mode}`, "
+                    "que esta versión del kernel no sabe aplicar."
+                )
+
+    def _merge_add(self, key: str, value: Dict[str, Any]) -> None:
+        """User entries are ADDED. Base entries can be neither overridden nor removed."""
+        base = getattr(self, key)
+        for name, spec in (value or {}).items():
+            if name in base:
                 raise SystemExit(
                     f"error: {USER_CONTRACT} redefine el tipo base `{name}`. "
                     "Los tipos del usuario se añaden; los base no se sobrescriben."
                 )
-            self.types[name] = spec
+            base[name] = spec
+
+    def _merge_choose(self, key: str, value: Any, spec: Dict[str, Any]) -> None:
+        """The user names one option; the kernel owns what the option means."""
+        options = self._lookup(spec.get("from", "")) or {}
+        if value not in options:
+            allowed = ", ".join(f"`{k}`" for k in options)
+            raise SystemExit(
+                f"error: {USER_CONTRACT} declara {key} = `{value}`, que no es una "
+                f"opción. Admitidas: {allowed}."
+            )
+        setattr(self, key, value)
+
+    def period_patterns(self) -> List[Tuple[str, str]]:
+        """(shape name, regex) for the declared shape -- or for all of them.
+
+        With nothing declared every shape is accepted. That still catches
+        `tercer trimestre` without demanding configuration and without assuming
+        a cycle the user never chose.
+        """
+        shapes = self.period_formats.get("shapes", {})
+        if self.period_format and self.period_format in shapes:
+            names = [self.period_format]
+        else:
+            names = list(shapes)
+        return [(n, shapes[n]["pattern"]) for n in names if shapes[n].get("pattern")]
 
     def fields_for(self, type_name: str) -> Dict[str, Any]:
         spec = self.types.get(type_name, {})
@@ -615,6 +675,7 @@ CHECKS = {
     "V18": ("okf", "el frontmatter lo acepta un parser YAML estándar"),
     "V19": ("profile", "el documento está en una ubicación declarada para su tipo"),
     "V20": ("profile", "las referencias por clave resuelven a un documento existente"),
+    "V21": ("profile", "`periodo` sigue el formato declarado"),
 }
 
 
@@ -869,6 +930,7 @@ class Validator:
                          severity=WARNING)
 
         self.check_location(doc, type_name)
+        self.check_period(doc, type_name)
         self.check_type_keys(doc, type_name)
         self.check_conditions(doc, type_name)
         self.check_classification(doc, type_name)
@@ -959,6 +1021,43 @@ class Validator:
         self.add("V19", doc.rel,
                  f"está en `{directory or '/'}`, y {type_name} se declara en {declared}",
                  severity=WARNING)
+
+    def check_period(self, doc: Document, type_name: str) -> None:
+        """The period format, in the two places it can drift apart.
+
+        The FIELD and the archive FOLDER SEGMENT are separate problems: a
+        document filed under `04-archivo/tercer trimestre/` is in the right
+        place -- V19 is content -- and merely named wrong. Both enter as
+        warnings, per severity_policy: v1 guaranteed the field's presence but
+        never its shape, so the shape is a new constraint.
+        """
+        patterns = self.contract.period_patterns()
+        if not patterns:
+            return
+        field = self.contract.period_formats.get("field", "periodo")
+        declared = self.contract.period_format
+
+        def offending(value: str) -> bool:
+            return not any(re.match(pat, value) for _, pat in patterns)
+
+        shapes = self.contract.period_formats.get("shapes", {})
+        if declared:
+            expected = (f"el formato declarado `{declared}` "
+                        f"(ej. {shapes[declared].get('example', '')})")
+        else:
+            expected = "ninguno de los formatos: " + ", ".join(
+                f"`{n}` (ej. {shapes[n].get('example', '')})" for n, _ in patterns)
+
+        value = doc.meta.get(field)
+        if isinstance(value, str) and value.strip() and offending(value.strip()):
+            self.add("V21", doc.rel,
+                     f"`{field}`: `{value}` no sigue {expected}", severity=WARNING)
+
+        for segment in period_segments(self.contract, type_name, doc.rel):
+            if offending(segment):
+                self.add("V21", doc.rel,
+                         f"la carpeta `{segment}` no sigue {expected}",
+                         severity=WARNING)
 
     def check_type_keys(self, doc: Document, type_name: str) -> None:
         """A reference by key is only a reference if it resolves."""
@@ -1061,19 +1160,27 @@ class Validator:
 
         Only the kernel's artifacts. The bundle's are V12 and V13; the
         hand-written scaffold under kernel/scaffold/ is nobody's output.
+
+        Compared against the KERNEL contract, reloaded without the bundle. The
+        kernel's output cannot depend on one brain's `cerebro/schema.json`, and
+        judging it against the merged contract got both directions wrong: a
+        user type demanded a kernel template that the kernel must never ship
+        (and whose suggested repair would write into `kernel/`), and a declared
+        `period_format` made a correct template look hand-edited.
         """
         kernel = self.contract.kernel
         if kernel is None or not kernel.is_dir():
             return
+        base = Contract.load(kernel / "schema" / "contract.json")
         expected: Dict[Path, str] = {}
-        for type_name, spec in self.contract.types.items():
+        for type_name, spec in base.types.items():
             if spec.get("generated_only"):
                 continue
             stem = type_name.lower()
             expected[kernel / "schema" / "templates" / f"{stem}.md"] = (
-                GENERATED_MARK + "\n" + render_template(self.contract, type_name))
+                GENERATED_MARK + "\n" + render_template(base, type_name))
             expected[kernel / "schema" / "json" / f"{stem}.schema.json"] = (
-                json.dumps(json_schema_for(self.contract, type_name), indent=2,
+                json.dumps(json_schema_for(base, type_name), indent=2,
                            ensure_ascii=False) + "\n")
         for rel, content in build_stubs(kernel).items():
             expected[kernel.parent / rel] = content
@@ -1182,6 +1289,31 @@ def location_patterns_for_match(contract: Contract, type_name: str,
     return out
 
 
+def period_segments(contract: Contract, type_name: str, rel: str) -> List[str]:
+    """The period folder names a document's own path actually carries.
+
+    Reads the same location declarations as V19, but captures the `{periodo}`
+    placeholder instead of wildcarding it -- so `04-archivo/{periodo}/{proyecto}/`
+    yields the period, and nothing has to name the archive folder twice.
+    """
+    field = contract.period_formats.get("field", "periodo")
+    token = "{" + field + "}"
+    directory = str(Path(rel).parent).replace("\\", "/")
+    directory = "" if directory == "." else directory
+    out: List[str] = []
+    for entry in contract.locations(type_name):
+        path = entry["path"].rstrip("/")
+        if token not in path:
+            continue
+        escaped = re.escape(path).replace(r"\{", "{").replace(r"\}", "}")
+        regex = PLACEHOLDER_IN_PATH.sub(
+            lambda m: "([^/]+)" if m.group(1) == field else "[^/]+", escaped)
+        match = re.match("^" + regex + "$", directory)
+        if match:
+            out.extend(g for g in match.groups() if g not in out)
+    return out
+
+
 def render_template(contract: Contract, type_name: str) -> str:
     _DATA_TYPE_HINTS.update({
         name: ds.get("hint", "") for name, ds in contract.data_types.items()
@@ -1227,6 +1359,13 @@ def _placeholder(name: str, field: Dict[str, Any], type_name: str,
         # design exists to prevent.
         floor = contract.min_classification(type_name)
         return f"{floor}          # mínimo de {type_name}: {floor}"
+    if name == contract.period_formats.get("field") and contract.period_format:
+        # Same reasoning as classification: once the brain has DECLARED its
+        # cycle, the template proposes that shape instead of asking the agent
+        # to go and look it up. Undeclared falls through to the generic hint,
+        # which keeps the kernel-level templates on disk stable.
+        shape = contract.period_formats["shapes"][contract.period_format]
+        return f"{shape.get('example', '')}          # formato {contract.period_format}"
     if kind == "enum":
         values = field.get("values", [])
         chosen = field.get("default", values[0] if values else "")

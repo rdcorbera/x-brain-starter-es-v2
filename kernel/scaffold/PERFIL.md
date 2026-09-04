@@ -56,11 +56,13 @@ classification: confidential
         Los nombres viven en las fichas Persona; repetirlos aquí los
         desincroniza. Esto define qué llega al inbox y de quién.
 
-     3. TU CICLO DE PLANIFICACIÓN y su formato de periodo (trimestral →
-        `2026-Q3`; mensual → `2026-08`; sprints → `2026-S14`). Es la decisión
-        más estructural del perfil: de ella dependen el campo `periodo` de cada
-        Iniciativa y las carpetas de `04-archivo/`. Escríbelo con un ejemplo
-        literal y respétalo — hoy nada comprueba que no derive.
+     3. TU CICLO DE PLANIFICACIÓN. Es la decisión más estructural del perfil:
+        de ella dependen el campo `periodo` de cada Iniciativa y las carpetas
+        de `04-archivo/`. Descríbelo aquí en prosa — cada cuánto cierras, qué
+        pasa en el cierre — pero el FORMATO no se escribe aquí: va como
+        `period_format` en `cerebro/schema.json`, con uno de tres nombres,
+        `quarterly` (`2026-Q3`), `monthly` (`2026-08`) o `sprint` (`2026-S14`).
+        Ahí es un dato que V21 comprueba, en vez de una convención que deriva.
 
      4. RITUALES E HITOS FIJOS. Comités, weeklies, cierres. Son las fechas
         recurrentes contra las que /x-briefing-diario y /x-preparar-reunion
