@@ -95,7 +95,8 @@ reabras decisiones ya cerradas sin consultar la bitácora.
 
 ### Cómo retomar
 
-1. **Lee `tmp/PLAN.md`** — la tabla de pasos dice qué está hecho y qué no.
+1. **Lee `tmp/PLAN.md`** — la tabla de pasos dice qué está hecho y qué no, y cada paso
+   pendiente tiene su sección «Punto de partida», que es por dónde empezar.
 2. **Comprueba que todo sigue en verde** antes de tocar nada:
    ```bash
    python3 kernel/tests/test_roundtrip.py     # contrato consistente consigo mismo
@@ -113,3 +114,6 @@ Viven en `tmp/PLAN.md`, junto a los riesgos. Las que bloquean trabajo hoy:
 - **`Decision` tiene cero documentos en el cerebro real** (R8), y es el tipo que más competency
   questions sostienen. Diferido a propósito al paso 8: hasta que haya skills que probar con
   datos ficticios no hay forma de distinguir «no se registran» de «se registran como otro tipo».
+- **El formato de `periodo` vive en prosa** (`cerebro/PERFIL.md`) y deriva sin que nada lo
+  detecte, aunque de él dependan el campo `periodo` de toda `Iniciativa` y las carpetas de
+  `04-archivo/`. Resolverlo **antes** de clasificar el corpus, o son 301 documentos a corregir.
