@@ -86,7 +86,7 @@ No hay política de retención: sin un mecanismo de disposición sería decoraci
 
 ## Uso de la capa determinista
 
-**Dónde va cada documento.** El contrato declara la ubicación de cada tipo con campos nombrados (`01-proyectos/{proyecto}/01-reuniones/`), así que `brain place` responde el destino y `/x-procesar-inbox` deja de decidirlo desde prosa. La misma declaración valida (V19) documentos ya escritos. Si aplican varios patrones, la herramienta devuelve los candidatos y decide el agente: quita la prosa, no el juicio.
+**Dónde va cada documento.** El contrato declara la ubicación de cada tipo con campos nombrados (`01-proyectos/{proyecto}/01-reuniones/`), así que `./brain place` responde el destino y `/x-procesar-inbox` deja de decidirlo desde prosa. La misma declaración valida (V19) documentos ya escritos. Si aplican varios patrones, la herramienta devuelve los candidatos y decide el agente: quita la prosa, no el juicio.
 
 ```bash
 ./brain place Reunion proyecto=2026-q3-erp
@@ -153,9 +153,9 @@ Un `cerebro/` compartido sigue siendo OKF-válido aunque no cumpla nuestro perfi
 
 ## Estado
 
-**Hecho** — corte 1: el contrato con 14 tipos, el validador de 20 checks, la capa de gobierno de datos (clasificación, responsabilidad, aplicación en pre-commit y CI), el enrutamiento (`brain place`), la generación de plantillas, JSON Schemas, esquema portable, índices y derivados, `brain init`, el conversor de insumos sin dependencias, el test de round-trip y los dos preflight. **Y la prosa del kernel** — `AGENTS.md`, la guía de uso, la instalación y el changelog—, escrita al final y contra un inventario regla por regla de v1: cada regla que desapareció nombra el comando que la sustituye.
+**Hecho** — corte 1: el contrato con 14 tipos, el validador de 20 checks, la capa de gobierno de datos (clasificación, responsabilidad, aplicación en pre-commit y CI), el enrutamiento (`./brain place`), la generación de plantillas, JSON Schemas, esquema portable, índices y derivados, `./brain init`, el conversor de insumos sin dependencias, el test de round-trip y los dos preflight. **Y la prosa del kernel** — `AGENTS.md`, la guía de uso, la instalación y el changelog—, escrita al final y contra un inventario regla por regla de v1: cada regla que desapareció nombra el comando que la sustituye.
 
-**Siguiente** — corte 1: los skills reescritos para invocar `brain.py`, y la migración del cerebro en producción.
+**En curso** — corte 1, paso 8: los skills reescritos para invocar `./brain`. Hecho `/x-setup`, que pasa de una entrevista de 30 minutos a elegir un **profile de rol** y ajustarlo en unos cinco. Quedan 15 skills, y después la migración del cerebro en producción.
 
 **Corte 2**: la proyección SQLite contra la Pendiente B. Su DDL se genera desde el mismo contrato, así que nada del corte 1 se desecha.
 

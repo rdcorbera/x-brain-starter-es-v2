@@ -182,10 +182,10 @@ Lee lo que reporta: casi siempre es una carpeta sincronizada o una unidad de red
 repositorio a una ruta local y vuelve a correrla. No lo ignores: el modo de fallo no es
 lentitud, es corrupción.
 
-**`brain validate cerebro` dice «cerebro sin inicializar».**
+**`./brain validate cerebro` dice «cerebro sin inicializar».**
 Falta el paso 3: `./brain init cerebro`.
 
-**`brain validate` reporta muchos hallazgos en un cerebro heredado.**
+**`./brain validate` reporta muchos hallazgos en un cerebro heredado.**
 Es lo esperado al migrar desde v1. Empieza por `validate --fix`, que arregla todo lo mecánico
 —índices, derivados y entrecomillado de frontmatter— sin tocar lo que redactó una persona.
 Lo que quede pide criterio.

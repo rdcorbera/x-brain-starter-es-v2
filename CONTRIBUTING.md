@@ -63,12 +63,23 @@ No negociables. Si un cambio los rompe, el cambio está mal.
    cada línea antes de escribirla. Nunca reescribe lo que una persona redactó.
 5. **Un artefacto generado no se edita.** Se edita `kernel/schema/contract.json` y se regenera.
    **V14 lo comprueba.**
+6. **El corte es por trabajos, y va en un solo sentido.** `const → parse → generate → validate
+   → report`, y `brain.py` encima como CLI. Un módulo solo importa de los que tiene a su
+   izquierda. Partir el archivo no sirve de nada si los módulos acaban importándose en círculo:
+   sería el mismo archivo repartido en cinco. **`check_layering` lo comprueba**, incluidos los
+   imports diferidos dentro de una función, que Python sí tolera.
 
 ## Convenciones
 
 - Archivos y carpetas en **kebab-case**. Los valores de `type` conservan los que producción ya
   usa (`Reunion`, `Pregunta`…): cambiarlos sería migrar todos los cerebros.
 - **Diagramas siempre como texto** (Mermaid), nunca solo imágenes.
+- **Los comandos se escriben `./brain <sub>`**, nunca `python3 kernel/bin/brain.py`. No hay un
+  nombre de intérprete portable: en Windows `python3` no existe y su alias abre la Microsoft
+  Store. El lanzador de la raíz resuelve `py -3`, `python3` y `python`, y corre también los
+  demás scripts: `./brain kernel/bin/to-markdown.py <archivo>`.
+- **Nunca pruebes contra el `cerebro/` del repositorio.** Se versiona vacío a propósito, y
+  `init`, `index` o `derive` lo llenan. Los temporales van al scratchpad.
 - Nada de credenciales, secretos ni datos de terceros — tampoco en ejemplos. Los ejemplos usan
   datos ficticios y se marcan como tales.
 
@@ -99,10 +110,13 @@ reabras decisiones ya cerradas sin consultar la bitácora.
    pendiente tiene su sección «Punto de partida», que es por dónde empezar.
 2. **Comprueba que todo sigue en verde** antes de tocar nada:
    ```bash
-   ./brain kernel/tests/test_roundtrip.py     # contrato consistente consigo mismo
-   ./brain generate       # los artefactos generados, al día
-   git diff --exit-code                       # el árbol no cambia al generar
+   ./brain kernel/tests/test_roundtrip.py   # el contrato es consistente consigo mismo
+   ./brain generate                         # los artefactos generados, al día
+   git diff --exit-code -- kernel/schema .claude .github/prompts   # no cambian al regenerar
+   git status --porcelain -- cerebro        # vacío: el starter no versiona conocimiento
    ```
+   El `git diff` va **acotado a lo generado**, no al árbol entero: mientras haya trabajo sin
+   commitear, un `--exit-code` a secas falla siempre y deja de informar.
 3. **Revisa `kernel/CHANGELOG.md` de v1** — avanza mientras construimos.
 
 ## Preguntas abiertas
@@ -114,6 +128,5 @@ Viven en `tmp/PLAN.md`, junto a los riesgos. Las que bloquean trabajo hoy:
 - **`Decision` tiene cero documentos en el cerebro real** (R8), y es el tipo que más competency
   questions sostienen. Diferido a propósito al paso 8: hasta que haya skills que probar con
   datos ficticios no hay forma de distinguir «no se registran» de «se registran como otro tipo».
-- **El formato de `periodo` vive en prosa** (`cerebro/PERFIL.md`) y deriva sin que nada lo
-  detecte, aunque de él dependan el campo `periodo` de toda `Iniciativa` y las carpetas de
-  `04-archivo/`. Resolverlo **antes** de clasificar el corpus, o son 301 documentos a corregir.
+- ~~**El formato de `periodo` vive en prosa**~~ **Cerrado (2026-09-03)**: vive en
+  `cerebro/schema.json` como `period_format`, con tres formas del kernel, y lo comprueba V21.

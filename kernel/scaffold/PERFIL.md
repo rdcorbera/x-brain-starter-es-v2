@@ -6,7 +6,7 @@ classification: confidential
 ---
 
 <!--
-  Este archivo lo rellena /x-setup con una entrevista. `brain init` solo lo deja
+  Este archivo lo rellena /x-setup con una entrevista. `./brain init` solo lo deja
   puesto, porque la estructura es mecánica y el contexto no.
 
   Es el segundo archivo que lee todo agente, después de kernel/AGENTS.md, y se

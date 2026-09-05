@@ -15,6 +15,7 @@ Stdlib only. Run from the repo root:
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 import io
 import re
@@ -385,13 +386,55 @@ def check_role_profiles(contract) -> List[str]:
     return problems
 
 
+def check_layering() -> List[str]:
+    """El corte por trabajos sigue siendo un corte.
+
+    Partir el archivo no vale de nada si al mes siguiente los módulos se
+    importan entre sí en círculo: volvería a ser un solo archivo, repartido en
+    cinco. Aquí se comprueba lo único que sostiene la separación — que las
+    dependencias van en UN sentido — y de paso que ningún módulo vuelve a
+    acercarse al umbral que obligó a cortar.
+
+    El orden declarado es const -> parse -> generate -> validate -> report.
+    Un módulo solo puede importar de los que tiene a su izquierda.
+    """
+    order = ["const", "parse", "generate", "validate", "report"]
+    lib = ROOT / "kernel" / "bin" / "brainlib"
+    problems = []
+
+    for rank, name in enumerate(order):
+        path = lib / f"{name}.py"
+        if not path.exists():
+            problems.append(f"falta kernel/bin/brainlib/{name}.py")
+            continue
+        source = path.read_text(encoding="utf-8")
+        for node in ast.walk(ast.parse(source)):
+            if not isinstance(node, ast.ImportFrom) or node.level != 1:
+                continue
+            target = node.module
+            if target not in order:
+                problems.append(f"{name}.py importa de `{target}`, que no es un trabajo")
+            elif order.index(target) >= rank:
+                problems.append(
+                    f"{name}.py importa de `{target}`: rompe el sentido único "
+                    f"({' -> '.join(order)})")
+
+    # 2.500 fue lo que disparó R6. Se mide por archivo, que es lo que el corte
+    # arregla; el total puede crecer y no es el problema.
+    for path in sorted(lib.glob("*.py")) + [ROOT / "kernel" / "bin" / "brain.py"]:
+        lines = len(path.read_text(encoding="utf-8").splitlines())
+        if lines > 1200:
+            problems.append(f"{path.name}: {lines} líneas — toca volver a cortar")
+    return problems
+
+
 def main() -> int:
     contract = brain.Contract.load(ROOT / "kernel" / "schema" / "contract.json")
     tmp = Path(tempfile.mkdtemp(prefix="brain-roundtrip-"))
     failures = (check_provenance(contract) + check_yaml_compatibility(contract)
                 + check_locations(contract) + check_derived_specs(contract)
                 + check_period_formats(contract) + check_role_profiles(contract)
-                + check_init(contract))
+                + check_layering() + check_init(contract))
 
     try:
         (tmp / "02-areas" / "personas").mkdir(parents=True)
@@ -428,9 +471,9 @@ def main() -> int:
 
     profiles = brain.find_profiles(ROOT / "kernel")
     print(f"OK -- provenance completo, derivados consistentes, formas de periodo "
-          f"disjuntas, los {len(profiles)} profiles de rol completos, `init` "
-          f"idempotente y validando, y las plantillas de los {len(tested)} tipos, "
-          "rellenadas, validan limpio.")
+          f"disjuntas, los {len(profiles)} profiles de rol completos, las capas "
+          f"sin ciclos, `init` idempotente y validando, y las plantillas de los "
+          f"{len(tested)} tipos, rellenadas, validan limpio.")
     return 0
 
 

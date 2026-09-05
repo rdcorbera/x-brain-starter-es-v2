@@ -102,7 +102,7 @@ git add . && git commit -m "brain: $(date +%F)" && git push
 ```
 
 El pre-commit valida lo que estás commiteando. Si algo falla, casi siempre lo arregla
-`brain.py validate --fix`.
+`./brain validate --fix`.
 
 ---
 
@@ -116,7 +116,7 @@ El pre-commit valida lo que estás commiteando. Si algo falla, casi siempre lo a
 | **Cuando haya versión nueva** | `/x-actualizar-sistema` | Trae el kernel más reciente desde GitHub |
 
 > El lint **estructural** —índices, derivados, enlaces, frontmatter— ya no es un ritual: lo
-> hace `brain.py validate` en cada commit y en cada corrida de CI, gratis. `/x-curar` se ocupa
+> hace `./brain validate` en cada commit y en cada corrida de CI, gratis. `/x-curar` se ocupa
 > solo de lo que exige criterio.
 
 ---
@@ -174,7 +174,7 @@ está en `raw/` y no se recupera — para portar un cerebro curado, usa el escen
 **Actualizar el sistema.** `/x-actualizar-sistema` trae la última versión del kernel. Como el
 upstream solo toca `kernel/`, los stubs y los archivos raíz —y tú nunca los editas— el merge es
 limpio. Si una versión requiere pasos manuales, su entrada en [`CHANGELOG.md`](CHANGELOG.md)
-los trae bajo **Migración**. Después de actualizar, corre `brain.py init cerebro`: pone al día
+los trae bajo **Migración**. Después de actualizar, corre `./brain init cerebro`: pone al día
 `ESQUEMA.md` y los derivados si el contrato cambió.
 
 ---
@@ -206,8 +206,8 @@ los trae bajo **Migración**. Después de actualizar, corre `brain.py init cereb
 
 Los de instalación están en [`INSTALL.md`](../INSTALL.md). Los de operación:
 
-**`brain validate` marca un `index.md` desactualizado.**
-`brain.py validate --fix`, o `brain.py index`. Nunca lo edites a mano: se regenera.
+**`./brain validate` marca un `index.md` desactualizado.**
+`./brain validate --fix`, o `./brain index`. Nunca lo edites a mano: se regenera.
 
 **Un enlace aparece como «sin destino».**
 Es `info`, no un error: marca conocimiento aún no escrito. Si debía existir, créalo; si no,
@@ -218,7 +218,7 @@ Un documento creado desde plantilla que quedó a medias. Los `<…>` son huecos 
 completar.
 
 **Un documento aparece «en una ubicación no declarada» (aviso).**
-Es dónde debería vivir según su tipo: `brain.py place <Tipo> proyecto=<slug>` te lo dice. Es
+Es dónde debería vivir según su tipo: `./brain place <Tipo> proyecto=<slug>` te lo dice. Es
 aviso y no error a propósito, porque un cerebro heredado tiene muchos.
 
 **Un `.xlsx` salió con columnas vacías.**

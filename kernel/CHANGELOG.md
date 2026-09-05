@@ -86,6 +86,18 @@ un `.venv` hermano, que en un entorno con `pip` restringido convierte el convers
 que no se puede instalar. **El `.pdf` es la única excepción**, y degrada con aviso en vez de
 fallar. Desaparecen el `.venv`, el `requirements.txt` y el re-exec.
 
+### `brain.py` se corta por sus cuatro trabajos
+
+- El archivo llegó a **2.582 líneas**, por encima del umbral que el rediseño se había fijado.
+  Ahora la lógica vive en `kernel/bin/brainlib/`, cortada **por trabajo**: `parse` (leer),
+  `generate` (escribir), `validate` (comprobar) y `report` (rendir), más `const` con el
+  vocabulario compartido. Ningún archivo pasa de 705 líneas.
+- **`kernel/bin/brain.py` sigue siendo el punto de entrada** y se queda con la CLI: `argparse`,
+  los `cmd_*` y el hook de git. Ni un comando cambia, y los artefactos generados salen **byte a
+  byte idénticos** — es lo que verifica que el corte no alteró comportamiento.
+- Las dependencias van en **un solo sentido** (`const → parse → generate → validate → report`)
+  y `check_layering` lo comprueba, incluidos los imports diferidos dentro de una función.
+
 ### El setup deja de ser una entrevista de 30 minutos
 
 - **Profiles de rol.** `/x-setup` ofrece elegir un rol —`ingeniero-de-sistemas`,

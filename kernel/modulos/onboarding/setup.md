@@ -150,5 +150,5 @@ setup es pedirle a alguien que describa un sistema que todavía no ha usado.
 | Lineamientos | `/x-decision` o a mano | Un lineamiento es un estándar real; **inventarlo sería fabricar** |
 
 Y dos que son deterministas y ya tienen comando: **la estructura de carpetas** la crea
-`brain init`, y **los índices y derivados** los escriben `brain index` y `brain derive`. Nunca
+`./brain init`, y **los índices y derivados** los escriben `./brain index` y `./brain derive`. Nunca
 se redactan a mano.
