@@ -283,6 +283,7 @@ frontmatter de cada módulo con `./brain stubs`.
 | Skill | Qué hace |
 |---|---|
 | `/x-setup` | Inicializa y personaliza el cerebro. Se elige un **profile de rol** y se ajusta, o se hace la entrevista completa |
+| `/x-nueva-iniciativa` | Abre una iniciativa con su `CONTEXT.md`, su `PLAN.md` y la documentación inicial procesada. `GOALS.md` se genera solo |
 
 <!-- TODO: las filas restantes se agregan al escribir los módulos que faltan. -->
 
