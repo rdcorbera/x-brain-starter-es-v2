@@ -331,12 +331,67 @@ def check_period_formats(contract) -> List[str]:
     return problems
 
 
+def check_role_profiles(contract) -> List[str]:
+    """Every role profile is a usable PERFIL.md, not just a file that parses.
+
+    The failure this prevents is silent: a profile missing one of the six
+    headings would seed a PERFIL.md with a section simply absent, and nothing
+    downstream would complain -- PERFIL.md is in `exempt_files`, so the
+    validator only asks it for a `type`.
+
+    The headings are read from the generic scaffold rather than listed here, so
+    adding a section to PERFIL.md makes this test demand it of every profile
+    instead of quietly passing.
+    """
+    problems = []
+    kernel = ROOT / "kernel"
+    scaffold = kernel / "scaffold" / "PERFIL.md"
+    expected = re.findall(r"^# (.+)$", scaffold.read_text(encoding="utf-8"), re.M)
+    if len(expected) < 2:
+        return [f"no se pudieron leer los encabezados de {scaffold}"]
+
+    profiles = brain.find_profiles(kernel)
+    if not profiles:
+        return ["no hay profiles en kernel/scaffold/profiles/"]
+
+    shapes = contract.period_formats.get("shapes", {})
+    for slug, entry in sorted(profiles.items()):
+        meta, body, path = entry["meta"], entry["body"], entry["path"]
+        where = path.relative_to(ROOT).as_posix()
+        assert path.stem == slug
+
+        if meta.get("profile"):
+            problems.append(f"{where}: trae `profile:`, que se eliminó — el slug es el "
+                            "nombre del archivo")
+        for key in ("title", "description"):
+            if not meta.get(key):
+                problems.append(f"{where}: falta `{key}`")
+        if meta.get("kind") not in ("individual", "leadership"):
+            problems.append(f"{where}: `kind` es `{meta.get('kind')}`, "
+                            "y solo vale individual o leadership")
+        period = meta.get("period_format")
+        if period not in shapes:
+            problems.append(f"{where}: propone period_format `{period}`, "
+                            f"que no es una forma del contrato ({', '.join(shapes)})")
+
+        found = re.findall(r"^# (.+)$", body, re.M)
+        for heading in expected:
+            if heading not in found:
+                problems.append(f"{where}: le falta la sección `# {heading}`")
+        if brain.frontmatter_block(body):
+            problems.append(f"{where}: el cuerpo trae su propio frontmatter; "
+                            "el de PERFIL.md lo pone el scaffold genérico")
+
+    return problems
+
+
 def main() -> int:
     contract = brain.Contract.load(ROOT / "kernel" / "schema" / "contract.json")
     tmp = Path(tempfile.mkdtemp(prefix="brain-roundtrip-"))
     failures = (check_provenance(contract) + check_yaml_compatibility(contract)
                 + check_locations(contract) + check_derived_specs(contract)
-                + check_period_formats(contract) + check_init(contract))
+                + check_period_formats(contract) + check_role_profiles(contract)
+                + check_init(contract))
 
     try:
         (tmp / "02-areas" / "personas").mkdir(parents=True)
@@ -371,9 +426,11 @@ def main() -> int:
               "archivo. En cualquier caso, uno de los dos está mal.")
         return 1
 
+    profiles = brain.find_profiles(ROOT / "kernel")
     print(f"OK -- provenance completo, derivados consistentes, formas de periodo "
-          f"disjuntas, `init` idempotente y validando, y las plantillas de los "
-          f"{len(tested)} tipos, rellenadas, validan limpio.")
+          f"disjuntas, los {len(profiles)} profiles de rol completos, `init` "
+          f"idempotente y validando, y las plantillas de los {len(tested)} tipos, "
+          "rellenadas, validan limpio.")
     return 0
 
 

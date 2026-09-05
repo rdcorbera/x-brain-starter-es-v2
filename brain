@@ -1,0 +1,46 @@
+#!/bin/sh
+# X-Brain launcher. Resolves the interpreter once, so nothing else has to.
+#
+# There is no single name that works on the three systems, and guessing wrong
+# on Windows is worse than an error: `python3.exe` is not created by the
+# python.org installer, and Windows 10+ ships an App Execution Alias for that
+# name that opens the Microsoft Store instead of failing. `python` is the one
+# that is missing on macOS, where Apple removed the system interpreter and
+# Homebrew installs `python3`.
+#
+# So the order is deliberate: `py -3` first because it is the Windows launcher
+# (PEP 397) and lives in C:\Windows, working even when Python is not on PATH;
+# then `python3` for macOS and Linux; then `python` as the last resort.
+#
+# Usage:
+#   ./brain validate cerebro                     -> kernel/bin/brain.py
+#   ./brain kernel/bin/to-markdown.py acta.docx  -> any .py in the repo
+#
+# The second form exists because every other script here has the same problem,
+# and `to-markdown.py` is one an AGENT runs. One resolution, not two rules.
+set -e
+
+here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+
+case "$1" in
+    *.py) script="$1"; shift ;;
+    *)    script="$here/kernel/bin/brain.py" ;;
+esac
+
+if [ ! -f "$script" ]; then
+    echo "brain: no encuentro \`$script\`." >&2
+    exit 1
+fi
+
+if command -v py >/dev/null 2>&1 && py -3 -c "" >/dev/null 2>&1; then
+    exec py -3 "$script" "$@"
+elif command -v python3 >/dev/null 2>&1; then
+    exec python3 "$script" "$@"
+elif command -v python >/dev/null 2>&1; then
+    exec python "$script" "$@"
+fi
+
+echo "brain: no encuentro un Python. Hace falta 3.11 o superior." >&2
+echo "       Windows: winget install Python.Python.3.14" >&2
+echo "       macOS:   brew install python@3.14" >&2
+exit 1

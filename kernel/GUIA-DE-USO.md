@@ -24,8 +24,10 @@ Combina cuatro patrones y una capa propia:
 | **Skills** | Mecánica: comandos `/x-*` que ejecutan flujos de entrevista y mantenimiento |
 | **La capa determinista** | `brain.py`: valida, genera y enruta **sin llamar a un modelo**, así que cuesta cero tokens y se puede correr cien veces |
 
-**Qué lo hace genérico:** nada de tu rol está cableado. El `/x-setup` te entrevista y crea tus
-áreas, tu mapa de personas, tu ciclo de planificación e incluso tipos de documento propios.
+**Qué lo hace genérico:** nada de tu rol está cableado. El `/x-setup` te ofrece un **profile de
+rol** para partir de algo escrito —o la entrevista completa, si prefieres— y de ahí salen tu
+ciclo de planificación, tus áreas y tus reglas. Si ningún profile se parece a tu trabajo, te
+haces el tuyo en `plugins/profiles/` sin tocar el kernel.
 
 **Qué lo hace actualizable y portable:** las zonas de propiedad. El sistema (`kernel/` y los
 stubs) es del starter y se actualiza desde GitHub; tu conocimiento (`cerebro/`), tus fuentes
@@ -71,7 +73,7 @@ creer que no existe.
 Para convertir algo a mano, o para pedir más filas de una hoja:
 
 ```bash
-python3 kernel/bin/to-markdown.py <archivo.xlsx> --rows 200 --stdout
+./brain kernel/bin/to-markdown.py <archivo.xlsx> --rows 200 --stdout
 ```
 
 ---
@@ -124,14 +126,15 @@ El pre-commit valida lo que estás commiteando. Si algo falla, casi siempre lo a
 No hace falta memorizarla —los skills la invocan— pero saber que existe cambia cómo trabajas.
 
 ```bash
-python3 kernel/bin/brain.py validate cerebro     # validar (dos niveles: OKF / perfil)
-python3 kernel/bin/brain.py validate --fix       # arreglar solo lo mecánico
-python3 kernel/bin/brain.py template Reunion     # imprimir la plantilla de un tipo
-python3 kernel/bin/brain.py place Reunion proyecto=2026-q3-erp   # ¿dónde va esto?
-python3 kernel/bin/brain.py index                # regenerar los index.md
-python3 kernel/bin/brain.py derive               # regenerar los índices derivados
-python3 kernel/bin/brain.py init cerebro         # materializar o poner al día la estructura
-python3 kernel/bin/brain.py govern cerebro       # informe de postura de gobierno de datos
+./brain validate cerebro     # validar (dos niveles: OKF / perfil)
+./brain validate --fix       # arreglar solo lo mecánico
+./brain template Reunion     # imprimir la plantilla de un tipo
+./brain place Reunion proyecto=2026-q3-erp   # ¿dónde va esto?
+./brain index                # regenerar los index.md
+./brain derive               # regenerar los índices derivados
+./brain profiles             # los profiles de rol disponibles
+./brain init cerebro         # materializar o poner al día la estructura
+./brain govern cerebro       # informe de postura de gobierno de datos
 ```
 
 **Lo que no se hace:** editar un archivo generado. `cerebro/ESQUEMA.md`, cada `index.md`,
@@ -149,8 +152,8 @@ la iniciativa y el archivo se actualiza solo. Al cerrar el periodo, mover el pro
 Python 3.9. Los dos son de solo lectura y ninguno emite la ruta en su salida.
 
 ```bash
-python3 kernel/bin/survey.py cerebro     # ¿dónde se van los tokens en este cerebro?
-python3 kernel/bin/sqlite-probe.py .     # ¿puede esta máquina alojar la proyección?
+./brain kernel/bin/survey.py cerebro     # ¿dónde se van los tokens en este cerebro?
+./brain kernel/bin/sqlite-probe.py .     # ¿puede esta máquina alojar la proyección?
 ```
 
 ---
@@ -227,5 +230,5 @@ Está escaneado: es imagen, no texto. El markdown lo avisa. Pide el original dig
 OCR. **No dejes que el agente «deduzca» el contenido.**
 
 **El cerebro creció y las consultas se sienten lentas o incompletas.**
-El patrón índice-primero funciona hasta cientos de páginas. Corre `python3 kernel/bin/survey.py
+El patrón índice-primero funciona hasta cientos de páginas. Corre `./brain kernel/bin/survey.py
 cerebro`: mide dónde se van los tokens y dice si ya toca la capa de consulta.

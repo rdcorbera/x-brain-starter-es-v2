@@ -1693,6 +1693,71 @@ def _ident(name: str) -> str:
     return re.sub(r"[^A-Za-z0-9_]", "_", name) or "n"
 
 
+def read_frontmatter(path: Path) -> Optional[Tuple[Dict[str, Any], str]]:
+    """(metadata, body) of a kernel markdown file, or None if it has no block.
+
+    Not a Document: these files live in the kernel, not in the bundle, and are
+    never validated as knowledge. What they share with a Document is the OKF
+    frontmatter, so they share its parser.
+    """
+    lines = path.read_text(encoding="utf-8").splitlines()
+    if not lines or lines[0].strip() != "---":
+        return None
+    end = next((i for i in range(1, len(lines)) if lines[i].strip() == "---"), None)
+    if end is None:
+        return None
+    try:
+        meta = parse_frontmatter(lines[1:end])
+    except ParseError:
+        return None
+    return meta, "\n".join(lines[end + 1:]).lstrip("\n")
+
+
+def frontmatter_block(text: str) -> str:
+    """The opening `---` block, verbatim and delimiters included.
+
+    A role profile replaces only the BODY of PERFIL.md. Its frontmatter --
+    `type`, `classification: confidential` -- is the same for every role, so it
+    stays declared once in the generic scaffold instead of being copied into
+    each profile, where it would drift.
+    """
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return ""
+    end = next((i for i in range(1, len(lines)) if lines[i].strip() == "---"), None)
+    return "" if end is None else "\n".join(lines[:end + 1]) + "\n"
+
+
+def find_profiles(kernel: Path) -> Dict[str, Dict[str, Any]]:
+    """The role profiles on offer, by slug: the kernel's, then the user's.
+
+    Two directories, one shape. `plugins/` is searched last and wins on a slug
+    collision, which is how a user adapts a shipped role without editing the
+    kernel -- copy it across and change it there.
+
+    `kernel/scaffold/profiles/` is deliberately a SUBdirectory: `cmd_init`
+    copies the scaffold with a non-recursive glob, so the moulds sit next to
+    PERFIL.md without being poured into every brain.
+
+    The slug is the FILENAME. It was a `profile:` field until the audit found
+    that the only value it was allowed to hold was the file's own stem -- a
+    field that can only ever be wrong is one to delete, not to validate.
+    """
+    out: Dict[str, Dict[str, Any]] = {}
+    for origin, directory in (("kernel", kernel / "scaffold" / "profiles"),
+                              ("usuario", kernel.parent / "plugins" / "profiles")):
+        if not directory.is_dir():
+            continue
+        for path in sorted(directory.glob("*.md")):
+            parsed = read_frontmatter(path)
+            if parsed is None:
+                continue
+            meta, body = parsed
+            out[path.stem] = {"meta": meta, "body": body,
+                              "path": path, "origin": origin}
+    return out
+
+
 def build_stubs(kernel: Path) -> Dict[str, str]:
     """Both stub trees from one source: the module frontmatter."""
     out: Dict[str, str] = {}
@@ -1700,16 +1765,10 @@ def build_stubs(kernel: Path) -> Dict[str, str]:
     if not modules.is_dir():
         return out
     for path in sorted(modules.rglob("*.md")):
-        lines = path.read_text(encoding="utf-8").splitlines()
-        if not lines or lines[0].strip() != "---":
+        parsed = read_frontmatter(path)
+        if parsed is None:
             continue
-        end = next((i for i in range(1, len(lines)) if lines[i].strip() == "---"), None)
-        if end is None:
-            continue
-        try:
-            meta = parse_frontmatter(lines[1:end])
-        except ParseError:
-            continue
+        meta, _ = parsed
         skill, description = meta.get("skill"), meta.get("description", "")
         if not skill:
             continue
@@ -2246,6 +2305,57 @@ def cmd_template(args) -> int:
     return 0
 
 
+def print_profile_proposals(profile: Dict[str, Any]) -> None:
+    """What the profile SUGGESTS, handed over by the command that applied it.
+
+    `init --profile` copies only the body, so the machine-readable suggestions
+    -- the period shape, the area folders -- never reach the bundle. Without
+    this they would have to be fetched by opening a kernel file by hand, which
+    is exactly the reading a command is supposed to replace.
+
+    They are printed as proposals, not applied. Areas in particular belong to
+    an organisation and not to a role: the name is almost always wrong until a
+    person renames it, and creating them here would be writing without asking.
+    """
+    meta = profile["meta"]
+    period, areas = meta.get("period_format"), meta.get("areas") or []
+    if not period and not areas:
+        return
+    print("\nPropuestas de este profile — se confirman con el usuario, no se aplican:")
+    if period:
+        print(f"  period_format: {period}"
+              "   -> cerebro/schema.json, una vez confirmado")
+    if areas:
+        print(f"  areas:         {', '.join(areas)}")
+        print("                 -> renombrarlas antes de crearlas: un área es de la "
+              "organización,\n                    no del rol")
+
+
+def cmd_profiles(args) -> int:
+    """The roles on offer, so /x-setup lists them instead of inventing them."""
+    # `--contract` is relative to the working directory, so a wrong one has to
+    # be an error: without this, running from outside the repo reported "no
+    # profiles" -- a wrong answer, which is worse than a failure.
+    if not Path(args.contract).is_file():
+        raise SystemExit(f"error: no encuentro el contrato en `{args.contract}`. "
+                         "Se corre desde la raíz del repositorio.")
+    kernel = Path(args.contract).parent.parent
+    profiles = find_profiles(kernel)
+    if not profiles:
+        print("no hay profiles. El kernel los trae en kernel/scaffold/profiles/, "
+              "y los tuyos van en plugins/profiles/.")
+        return 0
+    width = max(len(s) for s in profiles)
+    for slug in sorted(profiles):
+        meta = profiles[slug]["meta"]
+        print(f"  {slug:<{width}}  {meta.get('kind', '?'):<10} "
+              f"{profiles[slug]['origin']:<7}  {meta.get('title', '')}")
+        if meta.get("description"):
+            print(f"  {'':<{width}}  {meta['description']}")
+    print("\nSe aplican con `./brain init cerebro --profile <slug>`.")
+    return 0
+
+
 def cmd_index(args) -> int:
     bundle = Path(args.path)
     contract = Contract.load(Path(args.contract), bundle)
@@ -2353,12 +2463,31 @@ def cmd_init(args) -> int:
         if parent != bundle:
             parent.mkdir(parents=True, exist_ok=True)
 
+    # A role profile is just another scaffold PERFIL.md: same six headings, with
+    # the part the ROLE determines already written and only the part no profile
+    # can know left as a TODO. So applying one is choosing which mould to copy,
+    # which is work this loop already does -- not a new job.
+    profile = None
+    if getattr(args, "profile", None):
+        profiles = find_profiles(kernel)
+        profile = profiles.get(args.profile)
+        if profile is None:
+            known = ", ".join(f"`{s}`" for s in sorted(profiles)) or "ninguno"
+            raise SystemExit(
+                f"error: no existe el profile `{args.profile}`. Disponibles: {known}.\n"
+                "       Se listan con `brain.py profiles`.")
+
     for source in sorted((kernel / "scaffold").glob("*.md")):
         target = bundle / source.name
         if target.exists():
             continue          # never overwrite what a person filled in
-        write_if_changed(target, source.read_text(encoding="utf-8"))
-        print(f"wrote  {source.name}")
+        text = source.read_text(encoding="utf-8")
+        if profile is not None and source.name == "PERFIL.md":
+            text = frontmatter_block(text) + "\n" + profile["body"]
+        write_if_changed(target, text)
+        print(f"wrote  {source.name}" +
+              (f"  (profile {args.profile})"
+               if profile is not None and source.name == "PERFIL.md" else ""))
         wrote += 1
 
     if write_bundle_schema(contract, bundle):
@@ -2382,6 +2511,11 @@ def cmd_init(args) -> int:
 
     if not wrote:
         print(f"brain init {bundle}: ya estaba al día.")
+    # Last, so the proposals are the part still on screen when the skill reads
+    # them: everything above is a list of files, and this is the part a person
+    # has to answer.
+    if profile is not None:
+        print_profile_proposals(profile)
     return 0
 
 
@@ -2417,12 +2551,17 @@ def main() -> int:
     p.add_argument("type")
     p.set_defaults(func=cmd_template)
 
+    p = sub.add_parser("profiles", help="listar los profiles de rol disponibles")
+    p.set_defaults(func=cmd_profiles)
+
     p = sub.add_parser("index", help="regenerar los index.md")
     p.add_argument("path", nargs="?", default=str(DEFAULT_BUNDLE))
     p.set_defaults(func=cmd_index)
 
     p = sub.add_parser("init", help="materializar un cerebro (estructura y derivados)")
     p.add_argument("path", nargs="?", default=str(DEFAULT_BUNDLE))
+    p.add_argument("--profile", help="sembrar PERFIL.md con un profile de rol "
+                                     "(se listan con `brain.py profiles`)")
     p.set_defaults(func=cmd_init)
 
     p = sub.add_parser("derive", help="regenerar los índices derivados")

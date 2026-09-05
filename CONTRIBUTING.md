@@ -99,8 +99,8 @@ reabras decisiones ya cerradas sin consultar la bitácora.
    pendiente tiene su sección «Punto de partida», que es por dónde empezar.
 2. **Comprueba que todo sigue en verde** antes de tocar nada:
    ```bash
-   python3 kernel/tests/test_roundtrip.py     # contrato consistente consigo mismo
-   python3 kernel/bin/brain.py generate       # los artefactos generados, al día
+   ./brain kernel/tests/test_roundtrip.py     # contrato consistente consigo mismo
+   ./brain generate       # los artefactos generados, al día
    git diff --exit-code                       # el árbol no cambia al generar
    ```
 3. **Revisa `kernel/CHANGELOG.md` de v1** — avanza mientras construimos.

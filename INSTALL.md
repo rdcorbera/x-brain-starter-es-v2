@@ -35,7 +35,14 @@ piso dice qué tolera el código, no qué conviene instalar.
 - **macOS** — el del sistema no sirve: `brew install python@3.14`
 - **Linux** — según la distro
 
-Comprueba con `python --version` (en macOS/Linux, `python3 --version`).
+Comprueba con `py -3 --version` en Windows, `python3 --version` en macOS y Linux. **Esos
+nombres no coinciden a propósito**, y por eso el repositorio trae un lanzador —`./brain`—
+que resuelve el intérprete por ti: los comandos de esta guía se escriben una sola vez y
+funcionan en los tres sistemas.
+
+> Cuidado con `python3` en Windows: el instalador de python.org **no crea `python3.exe`**, y
+> Windows 10+ trae un alias que abre la Microsoft Store con ese nombre. No falla con un
+> error: abre una tienda.
 
 ---
 
@@ -60,7 +67,7 @@ git push -u origin main
 **Este paso no es opcional y no es una recomendación: es una comprobación que puede fallar.**
 
 ```bash
-python3 kernel/bin/sqlite-probe.py .
+./brain kernel/bin/sqlite-probe.py .
 ```
 
 Sale con código 1 si la ruta no sirve. Comprueba tres cosas:
@@ -89,7 +96,7 @@ ruta en su salida**: se puede compartir desde un entorno restringido.
 ## Paso 3 — Materializar el cerebro
 
 ```bash
-python3 kernel/bin/brain.py init cerebro
+./brain init cerebro
 ```
 
 Crea la estructura, el esquema portable y los índices derivados vacíos. Es determinista,
@@ -99,7 +106,7 @@ día `ESQUEMA.md` y los derivados después de actualizar el kernel.
 Comprueba que quedó bien:
 
 ```bash
-python3 kernel/bin/brain.py validate cerebro   # debe decir «sin hallazgos»
+./brain validate cerebro   # debe decir «sin hallazgos»
 ```
 
 ## Paso 4 — Activar los skills en tu herramienta
@@ -115,16 +122,22 @@ python3 kernel/bin/brain.py validate cerebro   # debe decir «sin hallazgos»
 /x-setup
 ```
 
-Una entrevista por rondas (~30 min): quién eres, cómo fluye tu trabajo y tu ciclo de
-planificación, tu mapa de personas, tus áreas, tus reglas de comunicación y confidencialidad, y
-tus objetivos del periodo. **Nada se escribe sin que lo revises y confirmes.**
+Te ofrece elegir un **profile de rol** —ingeniero de sistemas, arquitecto de tecnología, manager
+de ingeniería— y ajustarlo: **unos 5 minutos**. El profile trae escrito lo que es cierto del
+rol; tú respondes solo lo que nadie puede saber por ti —nombre, organización, antigüedad— y
+corriges lo que no encaje.
+
+Si no te reconoces en ninguno, la entrevista completa sigue estando ahí. Y si ninguno se parece
+a tu trabajo, puedes hacerte el tuyo: `plugins/profiles/`.
+
+**Nada se escribe sin que lo revises y confirmes.**
 
 Todo lo generado queda en `cerebro/`; el kernel no se toca.
 
 ## Paso 6 — Instalar el control de calidad
 
 ```bash
-python3 kernel/bin/brain.py hooks --install
+./brain hooks --install
 ```
 
 Instala un pre-commit que valida **solo lo que se commitea**. Un hook que falle sobre el corpus
@@ -149,8 +162,8 @@ en `raw/` y se sigue citando.
 ## Comprobación final
 
 ```bash
-python3 kernel/bin/brain.py validate cerebro    # sin hallazgos
-python3 kernel/tests/test_roundtrip.py          # el contrato es consistente consigo mismo
+./brain validate cerebro    # sin hallazgos
+./brain kernel/tests/test_roundtrip.py          # el contrato es consistente consigo mismo
 ```
 
 Si los dos pasan, el sistema está instalado. Sigue con
@@ -162,7 +175,7 @@ Si los dos pasan, el sistema está instalado. Sigue con
 
 **«to-markdown.py necesita Python 3.11+ y este es 3.9.x».**
 Es el Python del sistema (macOS trae 3.9). Instala uno propio y vuelve a comprobar con
-`python3 --version`.
+`python3 --version` (en Windows, `py -3 --version`).
 
 **La sonda de SQLite sale con código 1.**
 Lee lo que reporta: casi siempre es una carpeta sincronizada o una unidad de red. Mueve el
@@ -170,7 +183,7 @@ repositorio a una ruta local y vuelve a correrla. No lo ignores: el modo de fall
 lentitud, es corrupción.
 
 **`brain validate cerebro` dice «cerebro sin inicializar».**
-Falta el paso 3: `python3 kernel/bin/brain.py init cerebro`.
+Falta el paso 3: `./brain init cerebro`.
 
 **`brain validate` reporta muchos hallazgos en un cerebro heredado.**
 Es lo esperado al migrar desde v1. Empieza por `validate --fix`, que arregla todo lo mecánico

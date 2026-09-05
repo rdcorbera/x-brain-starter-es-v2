@@ -78,8 +78,8 @@ La política que no se ejecuta no es un control. v1 tenía **más** reglas de go
 **Frontmatter que abre en el visor.** Un valor con `: ` sin entrecomillar no es YAML válido: Obsidian y VS Code fallan con *«mapping values are not allowed here»*. V18 lo detecta sobre las líneas crudas, `--fix` entrecomilla lo que puede —verificando que el valor no cambie— y el bloque `frontmatter_rules` del contrato declara las reglas para el agente que escribe. Un valor con ` #` queda reportado sin arreglar: YAML ya lo trata como comentario, y entrecomillarlo resucitaría texto que nunca fue parte del valor.
 
 ```bash
-python3 kernel/bin/brain.py govern cerebro       # informe de postura de gobierno
-python3 kernel/bin/brain.py hooks --install      # instalar el pre-commit
+./brain govern cerebro       # informe de postura de gobierno
+./brain hooks --install      # instalar el pre-commit
 ```
 
 No hay política de retención: sin un mecanismo de disposición sería decoración. Va con el archivado, en un corte posterior.
@@ -89,24 +89,31 @@ No hay política de retención: sin un mecanismo de disposición sería decoraci
 **Dónde va cada documento.** El contrato declara la ubicación de cada tipo con campos nombrados (`01-proyectos/{proyecto}/01-reuniones/`), así que `brain place` responde el destino y `/x-procesar-inbox` deja de decidirlo desde prosa. La misma declaración valida (V19) documentos ya escritos. Si aplican varios patrones, la herramienta devuelve los candidatos y decide el agente: quita la prosa, no el juicio.
 
 ```bash
-python3 kernel/bin/brain.py place Reunion proyecto=2026-q3-erp
+./brain place Reunion proyecto=2026-q3-erp
 #  -> 01-proyectos/2026-q3-erp/01-reuniones/{fecha}-{tema}.md
 ```
 
-```bash
-python3 kernel/bin/brain.py init cerebro         # materializar (o poner al día) un cerebro
-python3 kernel/bin/brain.py validate cerebro     # validar (dos niveles: OKF / perfil)
-python3 kernel/bin/brain.py validate --fix       # arreglar solo lo mecánico
-python3 kernel/bin/brain.py validate --staged    # solo lo que se commitea
-python3 kernel/bin/brain.py template Reunion     # imprimir una plantilla
-python3 kernel/bin/brain.py index                # regenerar los index.md
-python3 kernel/bin/brain.py derive               # regenerar los índices derivados
-python3 kernel/bin/brain.py generate             # regenerar los artefactos del kernel
+> Todo va por `./brain`, el lanzador de la raíz (`brain.cmd` en PowerShell). **No existe un
+> nombre de intérprete que funcione en Windows, macOS y Linux a la vez**: en Windows `python3`
+> no lo crea el instalador y su alias abre la Microsoft Store. El lanzador prueba `py -3`,
+> `python3` y `python`, así que la resolución ocurre una vez y no como regla a recordar.
 
-python3 kernel/bin/to-markdown.py <archivo>     # insumo binario → markdown, sin dependencias
-python3 kernel/bin/survey.py cerebro           # medir dónde se van los tokens
-python3 kernel/bin/sqlite-probe.py .           # ¿puede esta máquina alojar la proyección?
-python3 kernel/tests/test_roundtrip.py         # generador y validador se comprueban entre sí
+```bash
+./brain profiles            # los profiles de rol disponibles
+./brain init cerebro         # materializar (o poner al día) un cerebro
+./brain init cerebro --profile <slug>   # sembrando PERFIL.md con un rol
+./brain validate cerebro     # validar (dos niveles: OKF / perfil)
+./brain validate --fix       # arreglar solo lo mecánico
+./brain validate --staged    # solo lo que se commitea
+./brain template Reunion     # imprimir una plantilla
+./brain index                # regenerar los index.md
+./brain derive               # regenerar los índices derivados
+./brain generate             # regenerar los artefactos del kernel
+
+./brain kernel/bin/to-markdown.py <archivo>     # insumo binario → markdown, sin dependencias
+./brain kernel/bin/survey.py cerebro           # medir dónde se van los tokens
+./brain kernel/bin/sqlite-probe.py .           # ¿puede esta máquina alojar la proyección?
+./brain kernel/tests/test_roundtrip.py         # generador y validador se comprueban entre sí
 ```
 
 ### Insumos binarios sin `pip`

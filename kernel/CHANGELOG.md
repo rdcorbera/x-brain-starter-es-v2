@@ -86,17 +86,41 @@ un `.venv` hermano, que en un entorno con `pip` restringido convierte el convers
 que no se puede instalar. **El `.pdf` es la única excepción**, y degrada con aviso en vez de
 fallar. Desaparecen el `.venv`, el `requirements.txt` y el re-exec.
 
+### El setup deja de ser una entrevista de 30 minutos
+
+- **Profiles de rol.** `/x-setup` ofrece elegir un rol —`ingeniero-de-sistemas`,
+  `arquitecto-de-tecnologia`, `manager-de-ingenieria`— y ajustarlo: **~5 minutos** en vez de las
+  6 rondas y 23 preguntas de v1. El profile trae escrito lo que es cierto del *rol*; solo se
+  pregunta lo que nadie puede saber por ti.
+- **Un profile propone, nunca afirma.** No siembra `Lineamiento`s ni `Sistema`s: un lineamiento
+  es un estándar real de una organización, e inventarlo sería fabricar. Las carpetas de área se
+  proponen, y se renombran antes de crearse.
+- **Extensible sin código:** `./brain profiles` lista los del kernel
+  (`kernel/scaffold/profiles/`) y los tuyos (`plugins/profiles/`), que **ganan ante el mismo
+  slug**. Añadir un rol es dejar caer un archivo.
+- Personas, objetivos y tipos propios ya no se preguntan en el setup: los crean
+  `/x-procesar-inbox`, `/x-nueva-iniciativa` y `/x-crear-plantilla` cuando aparecen.
+
+### `./brain`: un lanzador, porque `python3` no es portable
+
+- **No existe un nombre de intérprete que funcione en Windows, macOS y Linux.** En Windows el
+  instalador de python.org no crea `python3.exe`, y Windows 10+ trae un alias con ese nombre que
+  **abre la Microsoft Store en vez de fallar**. En macOS el que falta es `python`.
+- El repositorio trae `brain` (sh) y `brain.cmd` (cmd/PowerShell), que prueban `py -3`,
+  `python3` y `python` en ese orden. Toda la documentación y los módulos usan `./brain`.
+- Corre también los demás scripts: `./brain kernel/bin/to-markdown.py <archivo>`.
+
 ### Migración desde un cerebro v1
 
 Los cerebros de v1 **no son conformes al perfil de v2** hasta migrarlos, pero siguen siendo
 OKF-válidos y legibles. El camino:
 
 1. **Copia tu `cerebro/`, `raw/` y `plugins/`** a un clon del starter v2.
-2. **`python3 kernel/bin/brain.py init cerebro`** — crea lo que falte sin tocar lo que exista.
+2. **`./brain init cerebro`** — crea lo que falte sin tocar lo que exista.
    Nunca sobrescribe un archivo que ya está.
-3. **`python3 kernel/bin/brain.py validate cerebro`** — el informe de qué falta. Espera muchos
-   hallazgos la primera vez: la capa OKF v0.2 (`classification`, `generated`, `sources`,
-   `status`) no existe en ningún documento de v1.
+3. **`./brain validate cerebro`** — el informe de qué falta. Espera muchos hallazgos la primera
+   vez: la capa OKF v0.2 (`classification`, `generated`, `sources`, `status`) no existe en
+   ningún documento de v1.
 4. **`validate --fix`** — resuelve lo mecánico: índices, derivados y entrecomillado.
 5. **Lo que queda pide criterio**, y es sobre todo `classification`: es una decisión de
    gobierno por documento y **no se puede autocompletar**. Por eso su ausencia es aviso y no

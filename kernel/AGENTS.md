@@ -20,6 +20,14 @@ Todo agente que trabaje aquí lee, antes de actuar:
 X-Brain tiene una **capa determinista** —`kernel/bin/brain.py`— que nunca llama a un modelo,
 no tiene dependencias y se puede correr cien veces seguidas. Todo lo que hace, lo hace gratis.
 
+**Los comandos se invocan con `./brain`**, el lanzador de la raíz. No es cosmética: **no existe
+un nombre de intérprete que funcione en los tres sistemas.** En Windows el instalador de
+python.org no crea `python3.exe`, y Windows 10+ trae un alias con ese nombre que **abre la
+Microsoft Store en vez de fallar** — para un agente, peor que un error. En macOS es `python` el
+que falta. El lanzador prueba `py -3`, `python3` y `python` en ese orden, así que la resolución
+ocurre una vez y de forma determinista en lugar de ser una regla que recordar por sistema.
+También corre los demás scripts: `./brain kernel/bin/to-markdown.py <archivo>`.
+
 **La regla que ordena tu trabajo: si hay un comando, se usa el comando.** No porque sea más
 elegante, sino porque el modo alternativo —leer una especificación y escribir a mano— cuesta
 tokens y se equivoca. `brain template Reunion` cuesta unos 200 tokens; leer el esquema
@@ -34,6 +42,7 @@ completo para deducir lo mismo, unos 10.000.
 | Revisar a ojo si un documento está bien | `brain.py validate cerebro` |
 | Arreglar frontmatter mal entrecomillado, índices y derivados | `brain.py validate --fix` |
 | Crear la estructura de un cerebro nuevo | `brain.py init cerebro` |
+| Sembrar el `PERFIL.md` de un rol, en vez de entrevistar | `brain.py init cerebro --profile <slug>` |
 | Leer un `.pdf`, `.docx`, `.pptx`, `.xlsx` o `.drawio` | `kernel/bin/to-markdown.py <archivo>` |
 
 **Un artefacto generado no se edita: se regenera.** Si algo generado está mal, lo que está mal
@@ -56,13 +65,14 @@ del kernel**. Cada carpeta tiene un dueño único.
 | `cerebro/` | **El usuario** | Aquí vive TODO el conocimiento. Es portable: se copia entera a otro sistema |
 | `raw/` | **El usuario** (escribe solo `/x-procesar-inbox`) | Originales inmutables + `manifiesto.md`. Nunca se edita ni se borra nada |
 | `inbox/` | **El usuario** | Puerta de entrada transitoria. Se vacía al procesar |
-| `plugins/` | **El usuario** | Skills y plantillas propias |
+| `plugins/` | **El usuario** | Skills, plantillas y profiles de rol propios |
 
 - **Nunca escribas en `kernel/` ni en `.github/`.** Si un skill del kernel necesita cambiar, es
   un issue o un PR al starter, no una edición local. Excepciones: `/x-crear-skill` agrega stubs
   nuevos, y `/x-actualizar-sistema` trae cambios del upstream vía git.
 - **Lo personalizable vive fuera del kernel:** el contexto en `cerebro/PERFIL.md`, los tipos
-  propios en `cerebro/schema.json`, los skills propios en `plugins/skills/`.
+  propios en `cerebro/schema.json`, los skills propios en `plugins/skills/`, y los profiles
+  de rol propios en `plugins/profiles/`.
 - Si el usuario pide modificar el kernel, explícale la regla y ofrécele la alternativa.
 
 > **Esta sección la sostiene la convención, no una comprobación.** Nada impide técnicamente
@@ -194,7 +204,7 @@ El inbox recibe `.pdf`, `.docx`, `.pptx`, `.xlsx`, `.drawio`, `.html` y `.yaml`.
 agente abre un binario ni lo interpreta**: lo convierte y lee el `.md` resultante.
 
 ```bash
-python3 kernel/bin/to-markdown.py <archivo> --project <slug> --source /raw/<original>
+./brain kernel/bin/to-markdown.py <archivo> --project <slug> --source /raw/<original>
 ```
 
 Leer el binario quema miles de tokens y abre la puerta a inventar; la conversión es
@@ -244,9 +254,10 @@ x-brain/
 │   │   ├── templates/*.md        ← plantilla por tipo (generadas)
 │   │   └── json/*.schema.json    ← JSON Schema por tipo (generados)
 │   ├── scaffold/                 ← lo que `brain init` deja en un cerebro nuevo
+│   │   └── profiles/             ← los profiles de rol del kernel (init NO los copia)
 │   ├── modulos/                  ← la lógica de los skills
 │   └── tests/                    ← round-trip y competency questions
-├── plugins/                      ← EXTENSIONES DEL USUARIO (skills y plantillas propias)
+├── plugins/                      ← EXTENSIONES DEL USUARIO (skills, plantillas, profiles)
 ├── inbox/                        ← puerta de entrada de TODO (transitoria)
 ├── raw/                          ← originales inmutables + manifiesto.md
 └── cerebro/                      ← EL CONOCIMIENTO (bundle OKF, portable)
@@ -263,4 +274,32 @@ Se invocan con el prefijo `x-`. La lógica de cada uno vive una sola vez en `ker
 los stubs de `.claude/skills/` y `.github/prompts/` solo la cargan, y **se generan** desde el
 frontmatter de cada módulo con `brain.py stubs`.
 
-<!-- TODO: la tabla de skills se completa al escribir los módulos. -->
+| Skill | Qué hace |
+|---|---|
+| `/x-setup` | Inicializa y personaliza el cerebro. Se elige un **profile de rol** y se ajusta, o se hace la entrevista completa |
+
+<!-- TODO: las filas restantes se agregan al escribir los módulos que faltan. -->
+
+### Profiles de rol
+
+`/x-setup` no arranca con una entrevista de treinta minutos: ofrece un molde por rol y lo
+ajusta. Los moldes son markdown con frontmatter, descubiertos por glob:
+
+| Ruta | Dueño |
+|---|---|
+| `kernel/scaffold/profiles/*.md` | El kernel: trae tres |
+| `plugins/profiles/*.md` | El usuario. **El slug es el nombre del archivo, y ante el mismo nombre gana el suyo** |
+
+```bash
+./brain profiles                       # los disponibles
+./brain init cerebro --profile <slug>  # siembra PERFIL.md
+```
+
+**Añadir un rol es dejar caer un archivo**: sin código y sin tocar el contrato. Un profile lleva
+los mismos encabezados que `kernel/scaffold/PERFIL.md` y **no repite su frontmatter** — ese lo
+pone el scaffold genérico, para que `classification: confidential` se declare una sola vez.
+
+Y la regla que ninguna comprobación sustituye: **un profile propone, nunca afirma.** Solo puede
+llevar lo que es cierto del *rol*, jamás de la organización de quien lo elige. Por eso ninguno
+siembra `Lineamiento`s ni `Sistema`s: un lineamiento es un estándar real de una empresa concreta,
+e inventarlo sería fabricar.
