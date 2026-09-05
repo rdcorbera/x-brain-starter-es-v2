@@ -17,9 +17,11 @@ cargan automáticamente en cada sesión:
 ## Notas para Claude Code
 
 - **Antes de escribir un documento a mano, comprueba si hay un comando.**
-  `brain.py template <Tipo>` da los campos exactos por unos 200 tokens; deducirlos leyendo el
-  contrato cuesta unos 10.000. `brain.py place <Tipo> proyecto=<slug>` dice dónde va, y
-  `brain.py validate cerebro` comprueba el resultado. La lista completa está en
+  `./brain template <Tipo>` da los campos exactos por unos 200 tokens; deducirlos leyendo el
+  contrato cuesta unos 10.000. `./brain place <Tipo> proyecto=<slug>` dice dónde va, y
+  `./brain validate cerebro` comprueba el resultado. **Siempre `./brain`, nunca
+  `python3 kernel/bin/brain.py`**: no hay un nombre de intérprete portable, y en Windows
+  `python3` abre la Microsoft Store en vez de fallar. La lista completa está en
   [`kernel/AGENTS.md`](kernel/AGENTS.md).
 - **Un artefacto generado no se edita: se regenera.** `cerebro/ESQUEMA.md`, cada `index.md`,
   `PREGUNTAS-ABIERTAS.md`, `GOALS.md` y `ORGANIGRAMA.md` salen de

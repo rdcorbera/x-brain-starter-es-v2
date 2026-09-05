@@ -78,35 +78,42 @@ La política que no se ejecuta no es un control. v1 tenía **más** reglas de go
 **Frontmatter que abre en el visor.** Un valor con `: ` sin entrecomillar no es YAML válido: Obsidian y VS Code fallan con *«mapping values are not allowed here»*. V18 lo detecta sobre las líneas crudas, `--fix` entrecomilla lo que puede —verificando que el valor no cambie— y el bloque `frontmatter_rules` del contrato declara las reglas para el agente que escribe. Un valor con ` #` queda reportado sin arreglar: YAML ya lo trata como comentario, y entrecomillarlo resucitaría texto que nunca fue parte del valor.
 
 ```bash
-python3 kernel/bin/brain.py govern cerebro       # informe de postura de gobierno
-python3 kernel/bin/brain.py hooks --install      # instalar el pre-commit
+./brain govern cerebro       # informe de postura de gobierno
+./brain hooks --install      # instalar el pre-commit
 ```
 
 No hay política de retención: sin un mecanismo de disposición sería decoración. Va con el archivado, en un corte posterior.
 
 ## Uso de la capa determinista
 
-**Dónde va cada documento.** El contrato declara la ubicación de cada tipo con campos nombrados (`01-proyectos/{proyecto}/01-reuniones/`), así que `brain place` responde el destino y `/x-procesar-inbox` deja de decidirlo desde prosa. La misma declaración valida (V19) documentos ya escritos. Si aplican varios patrones, la herramienta devuelve los candidatos y decide el agente: quita la prosa, no el juicio.
+**Dónde va cada documento.** El contrato declara la ubicación de cada tipo con campos nombrados (`01-proyectos/{proyecto}/01-reuniones/`), así que `./brain place` responde el destino y `/x-procesar-inbox` deja de decidirlo desde prosa. La misma declaración valida (V19) documentos ya escritos. Si aplican varios patrones, la herramienta devuelve los candidatos y decide el agente: quita la prosa, no el juicio.
 
 ```bash
-python3 kernel/bin/brain.py place Reunion proyecto=2026-q3-erp
+./brain place Reunion proyecto=2026-q3-erp
 #  -> 01-proyectos/2026-q3-erp/01-reuniones/{fecha}-{tema}.md
 ```
 
-```bash
-python3 kernel/bin/brain.py init cerebro         # materializar (o poner al día) un cerebro
-python3 kernel/bin/brain.py validate cerebro     # validar (dos niveles: OKF / perfil)
-python3 kernel/bin/brain.py validate --fix       # arreglar solo lo mecánico
-python3 kernel/bin/brain.py validate --staged    # solo lo que se commitea
-python3 kernel/bin/brain.py template Reunion     # imprimir una plantilla
-python3 kernel/bin/brain.py index                # regenerar los index.md
-python3 kernel/bin/brain.py derive               # regenerar los índices derivados
-python3 kernel/bin/brain.py generate             # regenerar los artefactos del kernel
+> Todo va por `./brain`, el lanzador de la raíz (`brain.cmd` en PowerShell). **No existe un
+> nombre de intérprete que funcione en Windows, macOS y Linux a la vez**: en Windows `python3`
+> no lo crea el instalador y su alias abre la Microsoft Store. El lanzador prueba `py -3`,
+> `python3` y `python`, así que la resolución ocurre una vez y no como regla a recordar.
 
-python3 kernel/bin/to-markdown.py <archivo>     # insumo binario → markdown, sin dependencias
-python3 kernel/bin/survey.py cerebro           # medir dónde se van los tokens
-python3 kernel/bin/sqlite-probe.py .           # ¿puede esta máquina alojar la proyección?
-python3 kernel/tests/test_roundtrip.py         # generador y validador se comprueban entre sí
+```bash
+./brain profiles            # los profiles de rol disponibles
+./brain init cerebro         # materializar (o poner al día) un cerebro
+./brain init cerebro --profile <slug>   # sembrando PERFIL.md con un rol
+./brain validate cerebro     # validar (dos niveles: OKF / perfil)
+./brain validate --fix       # arreglar solo lo mecánico
+./brain validate --staged    # solo lo que se commitea
+./brain template Reunion     # imprimir una plantilla
+./brain index                # regenerar los index.md
+./brain derive               # regenerar los índices derivados
+./brain generate             # regenerar los artefactos del kernel
+
+./brain kernel/bin/to-markdown.py <archivo>     # insumo binario → markdown, sin dependencias
+./brain kernel/bin/survey.py cerebro           # medir dónde se van los tokens
+./brain kernel/bin/sqlite-probe.py .           # ¿puede esta máquina alojar la proyección?
+./brain kernel/tests/test_roundtrip.py         # generador y validador se comprueban entre sí
 ```
 
 ### Insumos binarios sin `pip`
@@ -146,9 +153,9 @@ Un `cerebro/` compartido sigue siendo OKF-válido aunque no cumpla nuestro perfi
 
 ## Estado
 
-**Hecho** — corte 1: el contrato con 14 tipos, el validador de 20 checks, la capa de gobierno de datos (clasificación, responsabilidad, aplicación en pre-commit y CI), el enrutamiento (`brain place`), la generación de plantillas, JSON Schemas, esquema portable, índices y derivados, `brain init`, el conversor de insumos sin dependencias, el test de round-trip y los dos preflight. **Y la prosa del kernel** — `AGENTS.md`, la guía de uso, la instalación y el changelog—, escrita al final y contra un inventario regla por regla de v1: cada regla que desapareció nombra el comando que la sustituye.
+**Hecho** — corte 1: el contrato con 14 tipos, el validador de 20 checks, la capa de gobierno de datos (clasificación, responsabilidad, aplicación en pre-commit y CI), el enrutamiento (`./brain place`), la generación de plantillas, JSON Schemas, esquema portable, índices y derivados, `./brain init`, el conversor de insumos sin dependencias, el test de round-trip y los dos preflight. **Y la prosa del kernel** — `AGENTS.md`, la guía de uso, la instalación y el changelog—, escrita al final y contra un inventario regla por regla de v1: cada regla que desapareció nombra el comando que la sustituye.
 
-**Siguiente** — corte 1: los skills reescritos para invocar `brain.py`, y la migración del cerebro en producción.
+**En curso** — corte 1, paso 8: los skills reescritos para invocar `./brain`. Hecho `/x-setup`, que pasa de una entrevista de 30 minutos a elegir un **profile de rol** y ajustarlo en unos cinco. Quedan 15 skills, y después la migración del cerebro en producción.
 
 **Corte 2**: la proyección SQLite contra la Pendiente B. Su DDL se genera desde el mismo contrato, así que nada del corte 1 se desecha.
 

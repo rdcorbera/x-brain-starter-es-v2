@@ -15,6 +15,7 @@ Stdlib only. Run from the repo root:
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 import io
 import re
@@ -274,12 +275,166 @@ def check_yaml_compatibility(contract) -> List[str]:
     return problems
 
 
+def check_period_formats(contract) -> List[str]:
+    """The period shapes, and the user declaration that selects one.
+
+    V14 shipped declared and dead for a whole cut because nothing exercised it.
+    V21 gets its test in the same commit as its code: each shape must accept its
+    own documented example and reject the other two, the undeclared brain must
+    accept all three, and every wrong declaration must be refused rather than
+    ignored -- a config typo that quietly does nothing is what V21 exists to end.
+    """
+    problems = []
+    shapes = contract.period_formats.get("shapes", {})
+    if not shapes:
+        return ["el contrato no declara `period_formats.shapes`"]
+
+    examples = {n: s["example"] for n, s in shapes.items()}
+    for name, spec in shapes.items():
+        pattern = spec["pattern"]
+        if not re.match(pattern, spec["example"]):
+            problems.append(
+                f"period_formats.{name}: su propio ejemplo `{spec['example']}` "
+                "no casa con su patrón")
+        for other, example in examples.items():
+            if other != name and re.match(pattern, example):
+                problems.append(
+                    f"period_formats.{name}: acepta `{example}`, que es el "
+                    f"ejemplo de `{other}` -- las formas deben ser disjuntas")
+
+    # Values the prose used to allow because `periodo` was an unchecked text field.
+    for junk in ("2026-q3", "Q3-2026", "tercer trimestre", "T3", "2026-8", "2026-S4"):
+        for name, spec in shapes.items():
+            if re.match(spec["pattern"], junk):
+                problems.append(f"period_formats.{name}: acepta `{junk}`")
+
+    base = ROOT / "kernel" / "schema" / "contract.json"
+    undeclared = brain.Contract.load(base)
+    if len(undeclared.period_patterns()) != len(shapes):
+        problems.append("sin declarar, period_patterns() no ofrece todas las formas")
+
+    for name in shapes:
+        c = brain.Contract.load(base)
+        c.merge_user({"period_format": name})
+        got = [n for n, _ in c.period_patterns()]
+        if got != [name]:
+            problems.append(f"declarado `{name}`, period_patterns() dio {got}")
+
+    for bad in ({"period_format": "trimestral"}, {"periodo_format": "monthly"},
+                {"types": {"Reunion": {}}}):
+        c = brain.Contract.load(base)
+        try:
+            c.merge_user(bad)
+        except SystemExit:
+            continue
+        problems.append(f"{bad} debía ser rechazado por merge_user y pasó")
+
+    return problems
+
+
+def check_role_profiles(contract) -> List[str]:
+    """Every role profile is a usable PERFIL.md, not just a file that parses.
+
+    The failure this prevents is silent: a profile missing one of the six
+    headings would seed a PERFIL.md with a section simply absent, and nothing
+    downstream would complain -- PERFIL.md is in `exempt_files`, so the
+    validator only asks it for a `type`.
+
+    The headings are read from the generic scaffold rather than listed here, so
+    adding a section to PERFIL.md makes this test demand it of every profile
+    instead of quietly passing.
+    """
+    problems = []
+    kernel = ROOT / "kernel"
+    scaffold = kernel / "scaffold" / "PERFIL.md"
+    expected = re.findall(r"^# (.+)$", scaffold.read_text(encoding="utf-8"), re.M)
+    if len(expected) < 2:
+        return [f"no se pudieron leer los encabezados de {scaffold}"]
+
+    profiles = brain.find_profiles(kernel)
+    if not profiles:
+        return ["no hay profiles en kernel/scaffold/profiles/"]
+
+    shapes = contract.period_formats.get("shapes", {})
+    for slug, entry in sorted(profiles.items()):
+        meta, body, path = entry["meta"], entry["body"], entry["path"]
+        where = path.relative_to(ROOT).as_posix()
+        assert path.stem == slug
+
+        if meta.get("profile"):
+            problems.append(f"{where}: trae `profile:`, que se eliminó — el slug es el "
+                            "nombre del archivo")
+        for key in ("title", "description"):
+            if not meta.get(key):
+                problems.append(f"{where}: falta `{key}`")
+        if meta.get("kind") not in ("individual", "leadership"):
+            problems.append(f"{where}: `kind` es `{meta.get('kind')}`, "
+                            "y solo vale individual o leadership")
+        period = meta.get("period_format")
+        if period not in shapes:
+            problems.append(f"{where}: propone period_format `{period}`, "
+                            f"que no es una forma del contrato ({', '.join(shapes)})")
+
+        found = re.findall(r"^# (.+)$", body, re.M)
+        for heading in expected:
+            if heading not in found:
+                problems.append(f"{where}: le falta la sección `# {heading}`")
+        if brain.frontmatter_block(body):
+            problems.append(f"{where}: el cuerpo trae su propio frontmatter; "
+                            "el de PERFIL.md lo pone el scaffold genérico")
+
+    return problems
+
+
+def check_layering() -> List[str]:
+    """El corte por trabajos sigue siendo un corte.
+
+    Partir el archivo no vale de nada si al mes siguiente los módulos se
+    importan entre sí en círculo: volvería a ser un solo archivo, repartido en
+    cinco. Aquí se comprueba lo único que sostiene la separación — que las
+    dependencias van en UN sentido — y de paso que ningún módulo vuelve a
+    acercarse al umbral que obligó a cortar.
+
+    El orden declarado es const -> parse -> generate -> validate -> report.
+    Un módulo solo puede importar de los que tiene a su izquierda.
+    """
+    order = ["const", "parse", "generate", "validate", "report"]
+    lib = ROOT / "kernel" / "bin" / "brainlib"
+    problems = []
+
+    for rank, name in enumerate(order):
+        path = lib / f"{name}.py"
+        if not path.exists():
+            problems.append(f"falta kernel/bin/brainlib/{name}.py")
+            continue
+        source = path.read_text(encoding="utf-8")
+        for node in ast.walk(ast.parse(source)):
+            if not isinstance(node, ast.ImportFrom) or node.level != 1:
+                continue
+            target = node.module
+            if target not in order:
+                problems.append(f"{name}.py importa de `{target}`, que no es un trabajo")
+            elif order.index(target) >= rank:
+                problems.append(
+                    f"{name}.py importa de `{target}`: rompe el sentido único "
+                    f"({' -> '.join(order)})")
+
+    # 2.500 fue lo que disparó R6. Se mide por archivo, que es lo que el corte
+    # arregla; el total puede crecer y no es el problema.
+    for path in sorted(lib.glob("*.py")) + [ROOT / "kernel" / "bin" / "brain.py"]:
+        lines = len(path.read_text(encoding="utf-8").splitlines())
+        if lines > 1200:
+            problems.append(f"{path.name}: {lines} líneas — toca volver a cortar")
+    return problems
+
+
 def main() -> int:
     contract = brain.Contract.load(ROOT / "kernel" / "schema" / "contract.json")
     tmp = Path(tempfile.mkdtemp(prefix="brain-roundtrip-"))
     failures = (check_provenance(contract) + check_yaml_compatibility(contract)
                 + check_locations(contract) + check_derived_specs(contract)
-                + check_init(contract))
+                + check_period_formats(contract) + check_role_profiles(contract)
+                + check_layering() + check_init(contract))
 
     try:
         (tmp / "02-areas" / "personas").mkdir(parents=True)
@@ -314,9 +469,11 @@ def main() -> int:
               "archivo. En cualquier caso, uno de los dos está mal.")
         return 1
 
-    print(f"OK -- provenance completo, derivados consistentes, `init` idempotente y "
-          f"validando, y las plantillas de los {len(tested)} tipos, rellenadas, "
-          "validan limpio.")
+    profiles = brain.find_profiles(ROOT / "kernel")
+    print(f"OK -- provenance completo, derivados consistentes, formas de periodo "
+          f"disjuntas, los {len(profiles)} profiles de rol completos, las capas "
+          f"sin ciclos, `init` idempotente y validando, y las plantillas de los "
+          f"{len(tested)} tipos, rellenadas, validan limpio.")
     return 0
 
 

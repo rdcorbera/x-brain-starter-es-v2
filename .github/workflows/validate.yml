@@ -54,6 +54,14 @@ jobs:
       - name: Round-trip -- generador y validador se comprueban entre sí
         run: python kernel/tests/test_roundtrip.py
 
+      # El lanzador es lo que ejecutan los agentes y toda la documentación, y su
+      # razón de ser es Windows: ahí `python3` no existe o cae en el stub de la
+      # Microsoft Store. Probarlo solo en Linux no probaría nada.
+      - name: El lanzador resuelve el intérprete en las dos plataformas
+        run: |
+          ./brain profiles
+          ./brain kernel/tests/test_roundtrip.py
+
       # Los dos preflight tienen piso 3.9, no 3.11: corren en la máquina de
       # destino ANTES de que se instale nada. Si alguien les cuela sintaxis
       # moderna, dejan de correr donde tienen que correr.

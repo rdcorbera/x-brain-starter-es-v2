@@ -11,7 +11,7 @@ orden**:
    edita.
 
 **Lo más importante si solo lees una línea:** hay comandos deterministas que ya hacen buena
-parte del trabajo, y usarlos no es opcional. `python3 kernel/bin/brain.py template <Tipo>` para
+parte del trabajo, y usarlos no es opcional. `./brain template <Tipo>` para
 saber qué campos lleva un documento, `place` para saber dónde va, `validate` para comprobarlo.
 Escribir frontmatter a mano deduciéndolo cuesta tokens y se equivoca.
 

@@ -86,6 +86,26 @@
     "process": "^process:[a-z0-9._-]+$",
     "agent":   "^[a-z0-9._-]+/[a-z0-9._-]+$"
   },
+  "user_contract": {
+    "note": "What cerebro/schema.json may declare. Everything here is dispatched by `mode`, so the next user-settable knob is a contract edit and not a code change. An undeclared key is an ERROR rather than silence: a typo in a config file that quietly does nothing is the failure this whole block exists to remove.",
+    "file": "cerebro/schema.json",
+    "keys": {
+      "types":         { "mode": "add",    "note": "User types are ADDED. Base types can be neither overridden nor removed." },
+      "period_format": { "mode": "choose", "from": "period_formats.shapes", "note": "The NAME of one shape -- quarterly, monthly or sprint -- never a regex. Writing the pattern is the kernel's job." }
+    }
+  },
+  "period_formats": {
+    "note": "The planning cycle's period format. It lived as prose in cerebro/PERFIL.md and drifted unchecked: `2026-Q3`, `2026-q3`, `Q3-2026`, `tercer trimestre` and `T3` all validated, because `periodo` is a text field and `text` has no branch in check_value. The user picks ONE shape BY NAME in cerebro/schema.json; the regex is written here, by whoever knows how to write one. Every shape sorts lexicographically, because these values are also the folder names under 04-archivo/ -- and folders sort.",
+    "field": "periodo",
+    "declared_in": "cerebro/schema.json, key `period_format`",
+    "undeclared": "A value is accepted if it matches ANY shape. That catches `tercer trimestre` without demanding configuration and without assuming a cycle the user never chose. /x-setup always declares one, so this only covers v1 brains mid-migration.",
+    "enforced_by": "V21",
+    "shapes": {
+      "quarterly": { "pattern": "^\\d{4}-Q[1-4]$",                "example": "2026-Q3",  "description": "Trimestral. Cuatro periodos por año." },
+      "monthly":   { "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",       "example": "2026-08",  "description": "Mensual. Mes a dos dígitos, con cero a la izquierda." },
+      "sprint":    { "pattern": "^\\d{4}-S(0[1-9]|[1-4][0-9]|5[0-3])$", "example": "2026-S14", "description": "Sprints numerados dentro del año, a dos dígitos con cero a la izquierda." }
+    }
+  },
   "classification": {
     "note": "Proposed taxonomy: the organization had none defined. Four levels ordered from least to most restrictive. The ORDER is load-bearing -- V16 compares against each type's floor. If the organization adopts its own taxonomy, replace it here and every generated artifact follows.",
     "field": "classification",
@@ -210,7 +230,7 @@
                       "placeholder": "slug de la carpeta, ej. 2026-q3-migracion-erp",
                       "note": "The project slug, and the identity every other type points at with `proyecto`. It existed only as a folder name until now, so nothing could resolve a reference to it and cut 2 would have had to derive the join key from the file path." },
         "origen":   { "data_type": "enum", "values": ["proyecto-asignado", "objetivo-personal", "objetivo-equipo"], "required": true },
-        "periodo":  { "data_type": "text", "required": true, "placeholder": "según el formato de PERFIL.md, ej. 2026-Q3", "note": "format declared in cerebro/PERFIL.md, e.g. 2026-Q3" },
+        "periodo":  { "data_type": "text", "required": true, "placeholder": "según el formato declarado, ej. 2026-Q3", "note": "shape named by `period_format` in cerebro/schema.json; the regex lives in `period_formats` and V21 enforces it. Presence stays an error (v1 templates guaranteed it); the FORMAT enters as a warning, per severity_policy" },
         "estado":   { "data_type": "enum", "values": ["iniciando", "en-progreso", "bloqueada", "entregada"], "default": "iniciando", "required": true },
         "sistemas": { "data_type": "list", "of": "typed-ref", "to": "Sistema" },
         "personas": { "data_type": "list", "of": "typed-ref", "to": "Persona" }
