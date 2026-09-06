@@ -289,6 +289,7 @@ frontmatter de cada módulo con `./brain stubs`.
 | `/x-setup` | Inicializa y personaliza el cerebro. Se elige un **profile de rol** y se ajusta, o se hace la entrevista completa |
 | `/x-nueva-iniciativa` | Abre una iniciativa con su `CONTEXT.md`, su `PLAN.md` y la documentación inicial procesada. `GOALS.md` se genera solo |
 | `/x-consultar` | Responde con lo que hay en el cerebro y su fuente. Ofrece archivar la respuesta si hubo síntesis, y registra la consulta |
+| `/x-procesar-inbox` | El ritual diario: archiva el original en `raw/`, lo convierte, lo integra en todas las páginas que toca y vacía el inbox |
 
 <!-- TODO: las filas restantes se agregan al escribir los módulos que faltan. -->
 

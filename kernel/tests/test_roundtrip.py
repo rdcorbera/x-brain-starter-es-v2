@@ -108,6 +108,22 @@ def check_provenance(contract) -> List[str]:
     return problems
 
 
+def accepts_sentinel(entry: dict, field: str, value: str) -> bool:
+    """Can this location receive a document whose `field` is the sentinel?
+
+    Two ways it cannot: the path interpolates the field -- so the sentinel ends
+    up as a directory name, which is not a place -- or a `when` rules it out.
+    """
+    if "{%s}" % field in entry["path"]:
+        return False
+    condition = entry.get("when", {}).get(field)
+    if condition is None:
+        return True
+    if isinstance(condition, dict):
+        return condition.get("not") != value
+    return condition == value
+
+
 def check_locations(contract) -> List[str]:
     """Locations must be resolvable, and key references must have a target.
 
@@ -135,6 +151,23 @@ def check_locations(contract) -> List[str]:
                 problems.append(f"{type_name}: `role` desconocido en `{path}`")
 
         for name, field in contract.fields_for(type_name).items():
+            # A sentinel is a value declared valid without resolving to a
+            # document -- so SOME location has to be able to receive it. Four
+            # types declared `transversal` (three of them as the DEFAULT) with
+            # nowhere to put such a document: every location interpolated
+            # `{proyecto}`, so the sentinel would have become a literal folder
+            # named `transversal`, and V19 flagged the document wherever it
+            # actually went. Found by hand while writing /x-procesar-inbox,
+            # which is the skill that routes them; checked here so the next one
+            # is not.
+            for sentinel in field.get("sentinels", []):
+                if not any(accepts_sentinel(entry, name, sentinel)
+                           for entry in contract.locations(type_name)):
+                    problems.append(
+                        f"{type_name}.{name} admite `{sentinel}` pero ninguna "
+                        f"ubicación puede recibirlo: o se declara una rama "
+                        f"`when: {{{name}: {sentinel}}}`, o sobra el centinela")
+
             if field.get("data_type") != "type-key":
                 continue
             target = field.get("to")
