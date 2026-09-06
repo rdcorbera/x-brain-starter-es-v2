@@ -135,6 +135,10 @@ en `cerebro/` y uno por proyecto, agrupados por fecha con `## AAAA-MM-DD` y lo m
 arriba. `./brain validate` comprueba que los encabezados sean fechas ISO (V3), pero **nadie
 escribe la entrada por ti**: todo skill que cree o modifique archivos termina agregando la suya.
 
+Y su contraparte: **`cerebro/log-consultas.md` registra lo que se PREGUNTA**, una línea por
+consulta, y lo escribe `/x-consultar`. Va aparte porque `log.md` es de escrituras y otros skills
+lo leen para responder «qué pasó»; una consulta no cambia nada. Mismo formato y mismo V3.
+
 ---
 
 ## Escribir frontmatter
@@ -284,6 +288,7 @@ frontmatter de cada módulo con `./brain stubs`.
 |---|---|
 | `/x-setup` | Inicializa y personaliza el cerebro. Se elige un **profile de rol** y se ajusta, o se hace la entrevista completa |
 | `/x-nueva-iniciativa` | Abre una iniciativa con su `CONTEXT.md`, su `PLAN.md` y la documentación inicial procesada. `GOALS.md` se genera solo |
+| `/x-consultar` | Responde con lo que hay en el cerebro y su fuente. Ofrece archivar la respuesta si hubo síntesis, y registra la consulta |
 
 <!-- TODO: las filas restantes se agregan al escribir los módulos que faltan. -->
 

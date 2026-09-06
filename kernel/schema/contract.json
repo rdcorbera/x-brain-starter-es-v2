@@ -495,9 +495,10 @@
   },
 
   "reserved_files": {
-    "note": "The filenames OKF reserves. `format` selects which structural check applies, so neither the name nor the rule is repeated in code.",
+    "note": "The filenames OKF reserves, plus one of ours. `format` selects which structural check applies, so neither the name nor the rule is repeated in code.",
     "index.md": { "format": "index", "generated": true, "note": "directory index; no frontmatter except at the bundle root, which may carry okf_version only" },
-    "log.md":   { "format": "log", "note": "date-grouped change history, newest first; headings are ISO YYYY-MM-DD" }
+    "log.md":   { "format": "log", "note": "date-grouped change history, newest first; headings are ISO YYYY-MM-DD" },
+    "log-consultas.md": { "format": "log", "note": "OURS, not OKF: what was ASKED of this brain, one line per query, written by /x-consultar. `log.md` records writes -- v1 had no record of a question, which is why the 9 `frequency` marks on the competency questions could not be closed by looking backwards (see the header of kernel/tests/competency-questions.yml) and why the 8.7x A/B verdict has an unmeasured half: A is measured per ingest, B per query. Kept OUT of log.md deliberately: that file is read by other skills to answer `what happened`, and reads are not changes. Same `log` format, so V3 already validates it and no code knew about it." }
   },
   "exempt_files": {
     "note": "Exempt from the PROFILE checks only -- never from OKF conformance. OKF requires typed frontmatter on every non-reserved .md, so these still need a `type`; what they do not need is to match a catalog type's field set.",
@@ -590,7 +591,7 @@
       "**Bundle**: esta carpeta es la raíz. Los enlaces que empiezan con `/` se resuelven desde aquí.",
       "**Puntero externo `/raw/...`**: apunta a las fuentes crudas del sistema que hospeda este cerebro, fuera del bundle. Si recibiste el cerebro sin sus fuentes, esos enlaces estarán rotos: es esperado, el conocimiento integrado está completo igual.",
       "**Enlaces rotos**: se toleran. Representan conocimiento aún no escrito, no errores.",
-      "Todo `.md` de conocimiento lleva frontmatter con `type`. Se exceptúan `index.md` (índice por carpeta) y `log.md` (historia de cambios, más reciente primero).",
+      "Todo `.md` de conocimiento lleva frontmatter con `type`. Se exceptúan `index.md` (índice por carpeta), `log.md` (historia de cambios, más reciente primero) y `log-consultas.md` (qué se le preguntó a este cerebro, una línea por consulta).",
       "Las fuentes de cada afirmación van al final de cada documento, bajo `# Citations`."
     ],
     "structure_heading": "Estructura de carpetas",
