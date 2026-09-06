@@ -249,7 +249,8 @@
       "filename": "PLAN.md",
       "note": "Introduced by v1 kernel 1.4.0. Its task rows live INSIDE the document as a markdown table, which is the first structured data this system has below document level. That is why cerebro/PENDIENTES.md cannot be generated yet -- see its entry in derived_files.",
       "fields": {
-        "proyecto":         { "data_type": "type-key", "to": "Iniciativa", "sentinels": ["transversal"], "required": true },
+        "proyecto":         { "data_type": "type-key", "to": "Iniciativa", "required": true,
+                              "note": "No `transversal` sentinel, unlike every other type keyed on a project: a PLAN.md lives inside a project folder by definition, so a plan with no project cannot exist. Declaring a value valid with nowhere to put it is the defect this removal closes." },
         "fuente-de-verdad": { "data_type": "enum", "values": ["cerebro", "externa"], "default": "cerebro", "required": true,
                               "hint": "`externa` si las tareas ya viven en Jira, Asana o un Excel del área; entonces este plan es un espejo y ningún skill afirma progreso global" },
         "tracker-externo":  { "data_type": "text", "required": false,
@@ -274,7 +275,10 @@
 
     "Insumo": {
       "description": "A received document converted to markdown, pointing at its original in /raw/",
-      "location": ["01-proyectos/{proyecto}/00-insumos/"],
+      "location": [
+        { "path": "01-proyectos/{proyecto}/00-insumos/", "when": { "proyecto": { "not": "transversal" } } },
+        { "path": "03-recursos/insumos/", "when": { "proyecto": "transversal" } }
+      ],
       "min_classification": "confidential",
       "governance_note": "External material whose content the system does not control. The raised floor forces a conscious declassification instead of assuming what arrived is harmless.",
       "note": "Not hand-written: `to-markdown.py` emits it. Known v1 drift this contract now catches: .htm and .yml produced `formato: htm` / `formato: yml`, outside the enum.",
@@ -292,7 +296,10 @@
 
     "Reunion": {
       "description": "Processed note from a meeting",
-      "location": ["01-proyectos/{proyecto}/01-reuniones/"],
+      "location": [
+        { "path": "01-proyectos/{proyecto}/01-reuniones/", "when": { "proyecto": { "not": "transversal" } } },
+        { "path": "02-areas/reuniones/", "when": { "proyecto": "transversal" } }
+      ],
       "filename": "{fecha}-{tema}.md",
       "fields": {
         "proyecto":   { "data_type": "type-key", "to": "Iniciativa", "sentinels": ["transversal"], "required": true, "default": "transversal" },
@@ -311,7 +318,10 @@
 
     "Decision": {
       "description": "Record of a decision with its context, alternatives and consequences",
-      "location": ["01-proyectos/{proyecto}/02-decisiones/"],
+      "location": [
+        { "path": "01-proyectos/{proyecto}/02-decisiones/", "when": { "proyecto": { "not": "transversal" } } },
+        { "path": "02-areas/decisiones/", "when": { "proyecto": "transversal" } }
+      ],
       "filename": "dec-{NNN}-{tema}.md",
       "fields": {
         "proyecto":        { "data_type": "type-key", "to": "Iniciativa", "sentinels": ["transversal"], "required": true, "default": "transversal" },
@@ -417,6 +427,7 @@
       "description": "A Mermaid/PlantUML diagram with its context",
       "location": [
         { "path": "01-proyectos/{proyecto}/03-diagramas/", "when": { "proyecto": { "not": "transversal" } } },
+        { "path": "03-recursos/diagramas/", "when": { "proyecto": "transversal" } },
         { "path": "02-areas/personas/", "when": { "clase": "organizacion" } }
       ],
       "filename": "{clase}-{tema}-v{version}.md",
@@ -495,9 +506,10 @@
   },
 
   "reserved_files": {
-    "note": "The filenames OKF reserves. `format` selects which structural check applies, so neither the name nor the rule is repeated in code.",
+    "note": "The filenames OKF reserves, plus one of ours. `format` selects which structural check applies, so neither the name nor the rule is repeated in code.",
     "index.md": { "format": "index", "generated": true, "note": "directory index; no frontmatter except at the bundle root, which may carry okf_version only" },
-    "log.md":   { "format": "log", "note": "date-grouped change history, newest first; headings are ISO YYYY-MM-DD" }
+    "log.md":   { "format": "log", "note": "date-grouped change history, newest first; headings are ISO YYYY-MM-DD" },
+    "log-consultas.md": { "format": "log", "note": "OURS, not OKF: what was ASKED of this brain, one line per query, written by /x-consultar. `log.md` records writes -- v1 had no record of a question, which is why the 9 `frequency` marks on the competency questions could not be closed by looking backwards (see the header of kernel/tests/competency-questions.yml) and why the 8.7x A/B verdict has an unmeasured half: A is measured per ingest, B per query. Kept OUT of log.md deliberately: that file is read by other skills to answer `what happened`, and reads are not changes. Same `log` format, so V3 already validates it and no code knew about it." }
   },
   "exempt_files": {
     "note": "Exempt from the PROFILE checks only -- never from OKF conformance. OKF requires typed frontmatter on every non-reserved .md, so these still need a `type`; what they do not need is to match a catalog type's field set.",
@@ -590,14 +602,14 @@
       "**Bundle**: esta carpeta es la raíz. Los enlaces que empiezan con `/` se resuelven desde aquí.",
       "**Puntero externo `/raw/...`**: apunta a las fuentes crudas del sistema que hospeda este cerebro, fuera del bundle. Si recibiste el cerebro sin sus fuentes, esos enlaces estarán rotos: es esperado, el conocimiento integrado está completo igual.",
       "**Enlaces rotos**: se toleran. Representan conocimiento aún no escrito, no errores.",
-      "Todo `.md` de conocimiento lleva frontmatter con `type`. Se exceptúan `index.md` (índice por carpeta) y `log.md` (historia de cambios, más reciente primero).",
+      "Todo `.md` de conocimiento lleva frontmatter con `type`. Se exceptúan `index.md` (índice por carpeta), `log.md` (historia de cambios, más reciente primero) y `log-consultas.md` (qué se le preguntó a este cerebro, una línea por consulta).",
       "Las fuentes de cada afirmación van al final de cada documento, bajo `# Citations`."
     ],
     "structure_heading": "Estructura de carpetas",
     "structure": {
       "01-proyectos/": "Trabajo con fecha de fin: una carpeta por proyecto, con su CONTEXT.md, insumos, reuniones, decisiones y preguntas.",
-      "02-areas/": "Responsabilidades continuas. Incluye `personas/` con las fichas y el organigrama.",
-      "03-recursos/": "Referencia: sistemas y herramientas, glosario, y lo que el rol necesite.",
+      "02-areas/": "Responsabilidades continuas. Incluye `personas/` con las fichas y el organigrama, y lo que no es de ningún proyecto: `reuniones/`, `decisiones/` y `preguntas/`.",
+      "03-recursos/": "Referencia: sistemas y herramientas, glosario, los insumos y diagramas que no son de ningún proyecto, y lo que el rol necesite.",
       "04-archivo/": "Proyectos cerrados, por periodo."
     },
     "classification_heading": "Clasificación de datos",
