@@ -19,6 +19,26 @@ documento que se archive, una `Pregunta`, y su línea en `cerebro/log-consultas.
 
 ---
 
+## Fase 0 — La compuerta de intención
+
+**Antes de abrir nada**, decidir de qué tipo es la pregunta. Una consulta que se responde sin el
+cerebro no debe pagar la lectura del cerebro.
+
+| Modo | Cuándo | Qué se abre |
+|---|---|---|
+| `directa` | La pregunta se responde sin la base: es general, o ya está respondida en esta misma conversación | **Nada.** Se responde y se registra |
+| `acotada` | El enunciado nombra un tipo, un proyecto o una persona | Solo ese alcance, **declarado antes de buscar** |
+| `abierta` | No hay ancla; hay que buscar de verdad | Fase 1 completa |
+
+El modo se declara **antes** de buscar, no después: elegirlo a posteriori es describir lo que se
+hizo, no decidirlo. Y se registra en la Fase 4, que es lo que permite saber después si la
+compuerta sobra, si está mal calibrada, o cuánto ahorra.
+
+**En `directa` se responde igual con honestidad:** si la respuesta viene del modelo y no de la
+base, se dice. Es la misma regla de siempre, no una excepción.
+
+---
+
 ## Fase 1 — Buscar por los índices, nunca a ciegas
 
 **Barrer el cerebro entero es el gasto que este sistema existe para evitar.** El orden importa:
@@ -110,16 +130,35 @@ Y la entrada en `cerebro/log.md`, porque aquí sí se escribió:
 `## AAAA-MM-DD`, lo más reciente arriba:
 
 ```markdown
-- <la pregunta, en una línea> — <N> docs · archivada | no
+- <la pregunta, en una línea> — <N> docs (<C> completos, <U> citados) · <modo> · archivada | no
 ```
 
-No es burocracia: **v1 no registraba ninguna pregunta**, y sin eso hay dos cosas que no se
-pueden saber mirando atrás — con qué frecuencia se pregunta cada cosa, y cuántas consultas hay
-por cada ingesta, que es lo que decide cuándo conviene la proyección consultable del corte 2. El
-`N` de documentos abiertos es la medida directa de lo que cuesta hoy navegar índices.
+**El formato no es libre: lo declara el contrato y lo comprueba V26**, porque la proyección del
+corte 2 lee estas líneas para que CQ-45 y CQ-46 se puedan responder con SQL como cualquier otra
+pregunta. Una línea mal formada no es un detalle de estilo: es un dato perdido.
+
+| Campo | Qué es |
+|---|---|
+| `<N>` | Cuántos documentos se miraron en total |
+| `<C>` | Cuántos se abrieron **enteros** |
+| `<U>` | Cuántos de esos completos acabaron **sosteniendo una afirmación** de la respuesta |
+| `<modo>` | `directa` · `acotada` · `abierta`, el de la Fase 0 |
+
+**`<U>` nunca puede superar a `<C>`**: citar lo que no se abrió es lo que prohíbe la regla de
+citas, y V26 lo rechaza.
+
+No es burocracia: **v1 no registraba ninguna pregunta**, y sin eso hay tres cosas que no se
+pueden saber mirando atrás — con qué frecuencia se pregunta cada cosa, cuántas consultas hay por
+cada ingesta, y **cuánto de lo que se abre sobra**. Esa última, `<U>` contra `<C>`, es la que
+decide dónde poner el tope de aperturas: hoy está en 5 a propósito, sin apretar, para que la
+distribución real se pueda ver antes de recortarla.
+
+**No escribas la razón `<U>/<C>`**: se calcula al consultar. Un derivado dentro de un log es lo
+que este sistema no hace.
 
 Una línea, sin prosa. Si la pregunta lleva un dato que el `PERFIL.md` marca como confidencial,
-se registra el asunto, no el dato.
+se registra el asunto, no el dato — **el texto de la pregunta no se proyecta**, solo los números,
+pero la línea vive en el cerebro y se comparte con él.
 
 ---
 
@@ -133,3 +172,4 @@ se registra el asunto, no el dato.
 | Resolver una contradicción entre dos páginas | El usuario. El skill la expone con ambas fuentes; anotar la versión superada es `/x-curar` |
 | Actualizar el `CONTEXT.md` o el `PLAN.md` de un proyecto con lo aprendido | `/x-actualizacion-semanal` o `/x-plan`. Consultar no reescribe el proyecto |
 | Archivar cualquier respuesta | Solo las que tienen síntesis. Copiar un dato ya escrito crea una segunda fuente de verdad |
+| Decidir el modo después de buscar | La Fase 0. Elegirlo a posteriori describe lo que pasó, no lo decide |

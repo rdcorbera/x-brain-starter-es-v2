@@ -44,6 +44,8 @@ completo para deducir lo mismo, unos 10.000.
 | Crear la estructura de un cerebro nuevo | `./brain init cerebro` |
 | Sembrar el `PERFIL.md` de un rol, en vez de entrevistar | `./brain init cerebro --profile <slug>` |
 | Leer un `.pdf`, `.docx`, `.pptx`, `.xlsx` o `.drawio` | `./brain kernel/bin/to-markdown.py <archivo>` |
+| Comprobar que los originales de `raw/` no han cambiado | `./brain verify-raw` |
+| Calcular el SHA-256 de un original, para su fila del manifiesto | `./brain hash <archivo>` |
 
 **Un artefacto generado no se edita: se regenera.** Si algo generado está mal, lo que está mal
 es `kernel/schema/contract.json`. Editar la salida es trabajo que se pierde en la siguiente
@@ -63,7 +65,7 @@ del kernel**. Cada carpeta tiene un dueño único.
 |---|---|---|
 | `kernel/`, `CLAUDE.md`, `README.md`, `.github/`, stubs `x-*` | **El starter (GitHub)** | Nadie la edita localmente. Se actualiza con `/x-actualizar-sistema` |
 | `cerebro/` | **El usuario** | Aquí vive TODO el conocimiento. Es portable: se copia entera a otro sistema |
-| `raw/` | **El usuario** (escribe solo `/x-procesar-inbox`) | Originales inmutables + `manifiesto.md`. Nunca se edita ni se borra nada |
+| `raw/` | **El usuario** (escribe solo `/x-procesar-inbox`) | Originales inmutables + `manifiesto.md`. Nunca se edita ni se borra nada, y **`./brain verify-raw` lo comprueba** por su SHA-256 |
 | `inbox/` | **El usuario** | Puerta de entrada transitoria. Se vacía al procesar |
 | `plugins/` | **El usuario** | Skills, plantillas y profiles de rol propios |
 
@@ -94,8 +96,9 @@ sustituye**.
    convivir en silencio: dilo. Al resolverse, la versión superada queda anotada como tal, con
    fecha y fuente — no se borra.
 3. **Fuentes crudas inmutables, en un solo lugar.** Los originales se conservan siempre en
-   `raw/`, como `AAAA-MM-DD-descripcion-uuid.ext`, y registrados en `raw/manifiesto.md`. El
-   wiki los cita; jamás los edita ni los reemplaza.
+   `raw/`, como `AAAA-MM-DD-descripcion-uuid.ext`, y registrados en `raw/manifiesto.md` con su
+   SHA-256. El wiki los cita; jamás los edita ni los reemplaza. **De los cuatro principios, este
+   es el único que se comprueba** — `./brain verify-raw`.
 4. **Las respuestas valiosas se archivan.** Una síntesis o un análisis generado al consultar la
    base no muere en el chat: ofrece archivarlo, para que las exploraciones compongan igual que
    las fuentes.
@@ -137,7 +140,12 @@ escribe la entrada por ti**: todo skill que cree o modifique archivos termina ag
 
 Y su contraparte: **`cerebro/log-consultas.md` registra lo que se PREGUNTA**, una línea por
 consulta, y lo escribe `/x-consultar`. Va aparte porque `log.md` es de escrituras y otros skills
-lo leen para responder «qué pasó»; una consulta no cambia nada. Mismo formato y mismo V3.
+lo leen para responder «qué pasó»; una consulta no cambia nada.
+
+Ahí la línea **no es prosa: es una interfaz**, porque la proyección la lee para responder con SQL
+cuántas consultas hubo y cuánto se abrió de más. Su forma está declarada en el contrato
+—`reserved_files["log-consultas.md"].line_format`, con sus reglas para el agente— y **la comprueba
+V26**, incluido lo que un patrón no puede expresar: que no se cite más de lo que se abrió.
 
 ---
 
@@ -254,7 +262,7 @@ x-brain/
 │   │   │   ├── const.py          ←   el vocabulario compartido
 │   │   │   ├── parse.py          ←   LEER: OKF-YAML, documentos, contrato, moldes
 │   │   │   ├── generate.py       ←   ESCRIBIR: plantillas, índices, derivados, stubs
-│   │   │   ├── validate.py       ←   COMPROBAR: los 21 checks, en dos niveles
+│   │   │   ├── validate.py       ←   COMPROBAR: los 22 checks, en dos niveles
 │   │   │   └── report.py         ←   RENDIR: lo que los otros tres encontraron
 │   │   ├── to-markdown.py         ← insumos binarios → markdown (cero tokens)
 │   │   ├── survey.py             ← preflight: dónde se van los tokens

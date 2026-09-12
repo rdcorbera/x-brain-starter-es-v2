@@ -419,6 +419,67 @@ def check_role_profiles(contract) -> List[str]:
     return problems
 
 
+def check_competency_questions(contract) -> List[str]:
+    """Every `fields` entry of a CQ must exist on at least one of its `types`.
+
+    The CQs are the acceptance criterion of the contract, and in cut 2 each
+    grows a `sql:` key -- a field that exists on none of its types cannot be
+    queried, so the test would fail then instead of now. The defect is not
+    hypothetical: the yml's own `intake_corrections` records it being caught by
+    hand once (`Pregunta no declara fecha`), and the Agent Zero intake
+    reproduced it exactly on another question. Nothing parsed this file until
+    now, so its consistency depended on somebody looking.
+
+    The semantics are UNION, not intersection: a CQ may list several types and
+    draw a different field from each -- CQ-32 needs `Reunion.asistentes` and
+    `Decision.decisores` at once, and that is correct. Only a field that exists
+    on NO declared type is an error.
+    """
+    path = ROOT / "kernel" / "tests" / "competency-questions.yml"
+    if not path.exists():
+        return []
+    problems: List[str] = []
+    common = set(contract.common)
+    # Fields a plan has decided to add but that are not in the contract yet.
+    # Declared in the yml itself so this list is not a second source of truth.
+    text = path.read_text(encoding="utf-8")
+    pending = set(re.findall(r"^\s*#\s*pending-field:\s*(\S+)", text, re.M))
+
+    for block in re.split(r"\n  - id: ", text)[1:]:
+        cq = block.split("\n", 1)[0].strip()
+        if cq.startswith("ADV"):
+            continue
+        types_m = re.search(r"^\s*types:\s*\[(.*?)\]", block, re.M)
+        fields_m = re.search(r"^\s*fields:\s*\[(.*?)\]", block, re.M)
+        if not types_m or not fields_m:
+            continue
+        types = [x.strip() for x in types_m.group(1).split(",") if x.strip()]
+        fields = [x.strip() for x in fields_m.group(1).split(",") if x.strip()]
+        for name in types:
+            if name not in contract.types:
+                problems.append(f"{cq} declara el tipo `{name}`, que no existe en el contrato")
+        if not types:
+            continue                       # transversal: only common fields apply
+        declared = set()
+        for name in types:
+            declared |= set(contract.fields_for(name)) if name in contract.types else set()
+        declared |= common
+        # A pending field is declared bare (`valido_hasta`, coming to several
+        # types) or scoped (`Lineamiento.estado`, coming to exactly one). The
+        # scoped form exists so that granting one type a field does not excuse
+        # the same name being missing everywhere else.
+        for field in fields:
+            if field in declared or field in pending:
+                continue
+            if any(f"{name}.{field}" in pending for name in types):
+                continue
+            problems.append(
+                f"{cq}: `{field}` no existe en ninguno de {types} ni es campo común "
+                "(si un plan lo va a añadir, decláralo con `# pending-field: <nombre>` "
+                "o `# pending-field: <Tipo>.<nombre>`)")
+    return problems
+
+
 def check_layering() -> List[str]:
     """El corte por trabajos sigue siendo un corte.
 
@@ -467,7 +528,8 @@ def main() -> int:
     failures = (check_provenance(contract) + check_yaml_compatibility(contract)
                 + check_locations(contract) + check_derived_specs(contract)
                 + check_period_formats(contract) + check_role_profiles(contract)
-                + check_layering() + check_init(contract))
+                + check_layering() + check_init(contract)
+                + check_competency_questions(contract))
 
     try:
         (tmp / "02-areas" / "personas").mkdir(parents=True)
@@ -505,8 +567,9 @@ def main() -> int:
     profiles = brain.find_profiles(ROOT / "kernel")
     print(f"OK -- provenance completo, derivados consistentes, formas de periodo "
           f"disjuntas, los {len(profiles)} profiles de rol completos, las capas "
-          f"sin ciclos, `init` idempotente y validando, y las plantillas de los "
-          f"{len(tested)} tipos, rellenadas, validan limpio.")
+          f"sin ciclos, `init` idempotente y validando, las competency questions "
+          f"cuadran con el contrato, y las plantillas de los {len(tested)} tipos, "
+          f"rellenadas, validan limpio.")
     return 0
 
 

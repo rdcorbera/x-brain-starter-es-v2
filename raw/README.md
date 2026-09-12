@@ -6,7 +6,8 @@ se nombra `AAAA-MM-DD-descripcion-uuid.ext` y tiene su fila en [`manifiesto.md`]
 ## Las reglas, que son tres y no admiten excepción
 
 1. **Nada se edita.** Ni se corrige, ni se renombra, ni se reorganiza. El wiki los cita; jamás
-   los reemplaza.
+   los reemplaza. **Esta sí se comprueba:** cada fila del manifiesto lleva el SHA-256 de su
+   original, y `./brain verify-raw` avisa si alguno cambió o si hay un archivo sin fila.
 2. **Nada se borra.** Aunque parezca redundante o superado.
 3. **Solo escribe `/x-procesar-inbox`.** Es la única vía por la que algo llega aquí.
 

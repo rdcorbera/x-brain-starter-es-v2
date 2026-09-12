@@ -33,7 +33,7 @@
 # (the value is `aceptada`) and on Sistema, plus three field names that do not
 # exist on the types they were attached to. See `intake_corrections` at the end.
 
-version: 2
+version: 3
 profile_version: 1
 
 questions:
@@ -121,7 +121,8 @@ questions:
     note: >-
       Solo respondible gracias a OKF v0.2. En v1 la obsolescencia era uno de los
       checks de juicio de /x-curar. Corregido en la entrada: el valor de `status`
-      es `stable`, no `vigente` -- `vigente` pertenece a Lineamiento.vigencia.
+      es `stable`, no `vigente` -- `vigente` pertenece a Lineamiento.estado
+      (llamado `vigencia` hasta la decisión D-4 del 2026-09-10).
 
   - id: CQ-37
     question: "¿Qué documentos de nivel confidencial o restringido tocan a este proyecto?"
@@ -161,8 +162,8 @@ questions:
     question: "¿Qué decisiones del proyecto X fueron reemplazadas, por cuál y cuándo?"
     asked_by: "gestión de proyecto/producto"
     types: [Decision]
-    fields: [estado, reemplazada_por, fecha]
-    criterion: "Decision con estado=reemplazada y reemplazada_por no vacío"
+    fields: [valido_hasta, reemplazada_por, fecha]
+    criterion: "Decision con valido_hasta no vacío y reemplazada_por no vacío"
     decision: "no reabrir lo ya cerrado; explicar por qué cambió el rumbo"
     frequency: mensual
     answer_shape: lista
@@ -339,8 +340,8 @@ questions:
     question: "¿Qué lineamientos vigentes aplican a este proyecto o área?"
     asked_by: "gestión de proyecto/producto, legal, roles regulados"
     types: [Lineamiento]
-    fields: [area, vigencia, fuente]
-    criterion: "Lineamiento con area coincidente y vigencia=vigente a fecha de hoy"
+    fields: [area, estado, valido_hasta, fuente]
+    criterion: "Lineamiento con area coincidente, valido_hasta vacío o futuro, y estado != en-revision"
     decision: "a qué norma me ciño; qué no puedo hacer"
     frequency: mensual
     answer_shape: lista
@@ -408,6 +409,267 @@ questions:
       `status` es `stable`. Ver type_verdicts: el tipo debe escindirse.
 
 
+  # == Bloque Agent Zero (2026-09-10) =========================================
+  # Las ocho que siguen y ADV-13/ADV-14 entran con el plan de implementación de
+  # las ideas de Agent Zero Memory. Aprobadas con cuatro correcciones; ver
+  # `revision_3_corrections` al final del archivo.
+
+  # -- coste de lectura: qué se abre, cuánto y por qué -------------------------
+
+  - id: CQ-45
+    question: "¿Qué proporción de mis consultas se respondió sin abrir ningún documento del cerebro?"
+    asked_by: "rol individual (dueño del repositorio)"
+    types: []
+    fields: [docs-abiertos, modo-consulta]
+    criterion: >-
+      líneas de log-consultas.md agrupadas por mes, contando las que registran
+      cero documentos abiertos y las que registran modo `directa`
+    decision: "si la compuerta de intención sobra, si está mal calibrada, o cuánto ahorra"
+    frequency: mensual
+    answer_shape: tabla
+    grows_with_n: false
+    evidence: >-
+      El propio archivo documenta que `frequency` no se puede cerrar mirando
+      atrás porque log.md registra escrituras y no preguntas. Esta CQ existe
+      para cerrar esa brecha hacia adelante, que es la única vía que queda.
+    cost_today: "no existe; el coste de lectura no se mide, solo se estima"
+    note: >-
+      No justifica un tipo ni un campo común: justifica extender la línea de
+      log-consultas.md con el modo y el conteo de aperturas. `grows_with_n:
+      false` es correcto y es el primero del archivo: el log crece con el número
+      de consultas, no con el tamaño del cerebro.
+      RESUELTO el 2026-09-10 (decisión D-6): el log SE PROYECTA como una
+      tabla más, así que esta CQ lleva `sql:` como cualquier otra y T8 no
+      necesita excepción. El formato de la línea está declarado en
+      `reserved_files["log-consultas.md"].line_format` del contrato y lo
+      comprueba V26 -- en el momento en que el proyector la parsea deja de ser
+      prosa y pasa a ser una interfaz, y una interfaz sin comprobación es lo que
+      este sistema existe para eliminar. Solo se proyectan los CONTEOS: el texto
+      de la pregunta no entra en la base.
+
+  - id: CQ-46
+    question: "¿Cuántos documentos abre una consulta típica, y cuántos de ellos completos?"
+    asked_by: "rol individual (dueño del repositorio)"
+    types: []
+    justifies: "campos comunes resumen/resumen_hash -- no un tipo"
+    fields: [docs-abiertos, cuerpos-abiertos, cuerpos-citados]
+    criterion: >-
+      distribución de docs-abiertos, cuerpos-abiertos y cuerpos-citados sobre
+      las líneas de log-consultas.md; el contraste que decide es
+      cuerpos-citados / cuerpos-abiertos -- qué proporción de lo que se abrió
+      entero acabó sosteniendo alguna afirmación de la respuesta
+    decision: "dónde fijar el tope de aperturas, y si el nivel intermedio está sirviendo"
+    frequency: mensual
+    answer_shape: tabla
+    grows_with_n: false
+    evidence: >-
+      Zhu & Wu 2026, §3.2: la memoria documental jerárquica se lee L0 -> L1 ->
+      L2 bajo un tope duro de aperturas de texto completo, para que el lector
+      se oriente en lo barato. El tope solo se puede calibrar midiendo.
+    cost_today: "no existe; survey.py estima la navegación de índices, no el consumo por consulta"
+    note: >-
+      Es la CQ que justifica `resumen` como campo redactado y no como
+      extracción mecánica de encabezados. Si la distribución muestra que las
+      consultas abren cuerpo igual, el resumen no está cumpliendo su función y
+      hay que revisar cómo se redacta -- no agregar más niveles.
+      LA MÉTRICA DE EFICIENCIA, decidida el 2026-09-10. `cuerpos-citados` sale
+      del conjunto de citas que la disciplina de ADV-13 ya obliga a construir:
+      un documento abierto entero que no sostiene ninguna afirmación se abrió de
+      más. La razón cuerpos-citados/cuerpos-abiertos es el desperdicio medido, y
+      es lo que fija el tope con evidencia en vez de con una estimación.
+      POR QUÉ EL TOPE ARRANCA EN 5 Y NO EN 2: un tope que aprieta impide
+      observar cuántos documentos habría necesitado la consulta. 5 no restringe
+      -- survey.py midió el baseline como «abrir 5 documentos» --, y esa es
+      exactamente su virtud durante la instrumentación: deja ver la distribución
+      real antes de recortarla. El coste de esa decisión es que el ahorro no
+      llega hasta que el tope se fije con datos.
+      Las dos lecturas que separa la métrica: si se abren 5 y se citan 2 de
+      forma sistemática, o el resumen no permite descartar (se arregla cómo se
+      redacta) o el agente abre por inercia (se arregla la regla del módulo).
+      Se proyecta igual que CQ-45; ver su nota.
+
+  # -- la línea de tiempo: cuándo cambió qué -----------------------------------
+
+  - id: CQ-47
+    question: "¿Qué pasó en esta iniciativa entre dos fechas, en orden cronológico y con su fuente?"
+    asked_by: "rol individual (cualquiera que gestione trabajo propio)"
+    types: [Reunion, Decision, Pregunta, Analisis, Plan]
+    fields: [fecha, fecha-creacion, ultima-revision, proyecto, title]
+    criterion: >-
+      una sola lista ordenada por fecha que mezcla los tipos fechados de un
+      proyecto; cada fila enlaza a su documento y declara su tipo
+    decision: "reconstruir el estado de un trabajo sin releer la carpeta entera"
+    frequency: semanal   # inferred
+    answer_shape: tabla
+    grows_with_n: true
+    evidence: >-
+      Mark, González & Harris 2005 (CHI): la reanudación tras interrupción es
+      la operación cara del trabajo fragmentado. Hertzum & Pejtersen 2000:
+      reconstruir el orden de los hechos es parte del coste de retomar.
+    cost_today: "abrir cada subcarpeta del proyecto y ordenar de memoria; crece con el proyecto"
+    note: >-
+      CORREGIDO en la revisión 3. La entrega decía «`fecha` y `proyecto` ya
+      existen en los cinco tipos implicados» y es falso: solo Reunion, Decision
+      y Analisis declaran `fecha`; Pregunta declara `fecha-creacion` y Plan
+      declara `ultima-revision`. Es el mismo desajuste que ya se corrigió una
+      vez en CQ-41.
+      CONSECUENCIA DE DISEÑO: la vista de eventos NO puede seleccionar por el
+      NOMBRE `fecha` -- omitiría dos de los cinco tipos en silencio. Se genera
+      sobre todo campo con `data_type: date`, y así un tipo nuevo con fecha
+      entra solo de verdad. `proyecto` sí está en los cinco.
+
+  # -- vigencia: qué valía cuándo ----------------------------------------------
+
+  - id: CQ-48
+    question: "¿Qué decisión o lineamiento estaba vigente sobre este tema en una fecha dada?"
+    asked_by: "gestión de proyecto/producto, legal, roles regulados"
+    types: [Decision, Lineamiento]
+    fields: [valido_desde, valido_hasta, estado, reemplazada_por, proyecto]
+    criterion: >-
+      dada una fecha F, los documentos con valido_desde <= F y valido_hasta
+      vacío o posterior a F; más la cadena de sucesión hacia adelante
+    decision: "responder por qué se hizo algo con el criterio que regía entonces, no con el de hoy"
+    frequency: mensual   # inferred
+    answer_shape: lista
+    grows_with_n: true
+    evidence: >-
+      Barreau & Nardi 1995: el valor de un archivo personal está en poder
+      reconstruir el contexto de una decisión pasada, no solo su resultado.
+      Para roles regulados, la trazabilidad de la versión superada es requisito
+      de auditoría y no comodidad.
+    cost_today: "no se puede responder: la supersesión de v1 vive en prosa y no hay vigencia declarada"
+    note: >-
+      `reemplazada_por` no se reemplaza, se complementa: responde QUÉ sustituyó
+      a qué, y es lo que encadena la genealogía. `valido_desde`/`valido_hasta`
+      responden DESDE y HASTA cuándo rigió. Son dos ejes distintos.
+      RESUELTO el 2026-09-10 (decisión D-4, opción B: el intervalo manda).
+      Lineamiento gana `valido_desde`, `valido_hasta` y `reemplazada_por`, y su
+      `vigencia` se renombra a `estado`. `proyecto` NO se le añade: un
+      lineamiento vive en 02-areas/{area}/ y es de área, no de proyecto -- en
+      esta CQ ese campo aplica solo a Decision.
+      ATENCIÓN: ocho CQs ya dependen de `Decision`, que tiene cero documentos en
+      el cerebro real. Auditar ese hueco antes de construir encima -- ver
+      corpus_reality_check.
+
+  - id: CQ-51
+    question: "¿Qué reglas caducaron sin que nadie las reemplazara?"
+    asked_by: "gestión de proyecto/producto, legal, roles regulados"
+    types: [Decision, Lineamiento]
+    justifies: "campos valido_desde/valido_hasta en Decision y Lineamiento"
+    fields: [valido_hasta, reemplazada_por, estado]
+    criterion: "documentos con valido_hasta ya pasado y reemplazada_por vacío"
+    decision: "detectar el vacío normativo antes de que alguien decida sin criterio"
+    frequency: esporadica
+    answer_shape: lista
+    grows_with_n: true
+    evidence: >-
+      Es el caso que un modelo derivado de la cadena de supersesión NO puede
+      expresar: sin sucesor no hay fecha de cierre, y la regla figura vigente
+      para siempre. Kaliciński 2026 sobre ontology drift: el modelo se
+      desalinea en silencio mientras las consultas siguen devolviendo
+      resultados plausibles.
+    cost_today: "no existe; una regla caducada sigue apareciendo como vigente"
+    note: >-
+      Esta es la CQ que decide entre declarar la vigencia y derivarla. Si se
+      rechaza, `valido_desde`/`valido_hasta` no entran y la vigencia vuelve a
+      ser una vista sobre `reemplazada_por` -- más barata y estrictamente menos
+      expresiva.
+      RESUELTO igual que CQ-48: con la opción B, `valido_hasta` sin
+      `reemplazada_por` ES la definición de caducado sin reemplazo, así que esta
+      CQ deja de necesitar un `estado` que lo diga aparte. Es el caso que la
+      opción B expresa mejor que ninguna otra.
+
+  # -- encontrar sin navegar índices -------------------------------------------
+
+  - id: CQ-49
+    question: "¿Qué documentos mencionan este término exacto — un identificador, un nombre propio, un sistema?"
+    asked_by: "rol individual"
+    types: []
+    fields: [title, description, resumen]
+    criterion: >-
+      búsqueda léxica con ranking sobre título, descripción, resumen y cuerpo;
+      devuelve rutas ordenadas, nunca contenido
+    decision: "qué abrir, y qué documentos hay que actualizar cuando algo cambia"
+    frequency: diaria   # inferred
+    answer_shape: lista
+    grows_with_n: true
+    evidence: >-
+      Teevan et al. 2007: la reconsulta de información ya conocida es una
+      fracción alta del uso y se hace por término recordado más que por
+      navegación. Zhu & Wu 2026, §5.4: el canal léxico recupera identificadores,
+      nombres y términos raros que la similitud semántica difumina.
+    cost_today: "navegar índices y abrir candidatos; el coste crece con el cerebro"
+    note: >-
+      `types: []` a propósito: la pregunta es transversal al catálogo, y no
+      justifica ningún campo -- el cuerpo no es un campo de frontmatter. Es la
+      única CQ del conjunto que no se responde con SQL sobre frontmatter, y por
+      eso es la que justifica el índice de texto.
+      DEPENDE de que `resumen` exista. Aprobado el 2026-09-10.
+      La ablación de Zhu & Wu (Tabla 7) mide el techo de este canal sin
+      vectores densos: léxico solo cuesta 1,8 puntos frente al híbrido, y aun
+      así supera a todos los sistemas externos comparados.
+
+  # -- cierre de ciclo ---------------------------------------------------------
+
+  - id: CQ-50
+    question: "¿Qué aprendimos en las iniciativas cerradas que siga sirviendo hoy?"
+    asked_by: "rol individual / gestión"
+    types: [Iniciativa, Decision, Analisis, Lineamiento]
+    fields: [estado, periodo, proyecto]
+    criterion: >-
+      documentos de iniciativas cerradas cuyo contenido fue promovido a un área
+      permanente; y el inverso, iniciativas cerradas sin nada promovido
+    decision: "qué rescatar antes de archivar, y detectar lo que se archivó en crudo"
+    frequency: esporadica
+    answer_shape: lista
+    grows_with_n: true
+    evidence: >-
+      Wegner 1987 (memoria transactiva): el conocimiento de un grupo se pierde
+      cuando el portador sale del grupo. Un proyecto cerrado es el caso más
+      frecuente de esa salida. Zhu & Wu 2026, §3.4: lo aprendido al completar
+      una tarea se promueve a memoria persistente en vez de morir con la sesión.
+    cost_today: "no existe; el conocimiento del proyecto se archiva junto con él"
+    note: >-
+      No pide tipo nuevo ni campo nuevo. Pregunta por movimiento entre carpetas
+      PARA, que ya es derivable de la ubicación y el estado. `estado` y
+      `periodo` los aporta Iniciativa; `proyecto` es la clave de unión. Como en
+      CQ-42, CQ-26, CQ-41 y CQ-39, hay un tipo listado que no aporta ninguno de
+      los tres campos -- aquí Lineamiento: está por ser destino de promoción,
+      no por aportar columnas.
+
+  # -- procedencia: cómo entró cada cosa ---------------------------------------
+
+  - id: CQ-52
+    question: "¿Qué afirmaciones de este cerebro son lectura directa de una fuente y cuáles son inferencia de un agente?"
+    asked_by: "roles regulados, legal, gestión"
+    types: []
+    justifies: "campo común procedencia -- no un tipo"
+    fields: [procedencia, generated, verified]
+    criterion: >-
+      documentos agrupados por procedencia; y el cruce que importa,
+      procedencia=inferido con verified vacío
+    decision: "cuánto peso dar a una afirmación, y qué revisar primero"
+    frequency: mensual   # inferred
+    answer_shape: tabla
+    grows_with_n: true
+    evidence: >-
+      Zhu & Wu 2026, §3.1, postulado P1: la inferencia falible queda impedida
+      de corromper la verdad de base «por disciplina de tipo, no por política».
+      `actors` responde QUIÉN escribió el documento; no responde CÓMO entró la
+      afirmación. Un agente transcribiendo un insumo y un agente infiriendo de
+      una discusión son el mismo actor con fiabilidad distinta.
+    cost_today: "no se distingue; `generated` mezcla la transcripción fiel con la inferencia"
+    note: >-
+      Justifica `procedencia` como campo común y no como tipo nuevo. Un tipo
+      separado para lo experiencial expresaría lo mismo duplicando plantillas,
+      ubicaciones y checks, y solo para sus propios documentos; el enum lo
+      expresa en todo el catálogo. Valores: fuente, dialogo, inferido, manual.
+      CORREGIDO en la revisión 3: la entrega lo llamaba `origen`, y ese nombre
+      ya está tomado dos veces con dos tipos de dato distintos --
+      `Iniciativa.origen` es un enum y `Insumo.origen` un enlace a /raw/--, y
+      `derived_files.GOALS.md` agrupa por él. `procedencia` no colisiona con
+      nada y es el término del paper.
+
 # Adversarial questions: things the system must NOT be able to answer wrongly.
 # Tested like the rest, but they pass when the system refuses or warns, not
 # when it answers. ADV-01..04 are inherited from the draft and carry no
@@ -417,13 +679,13 @@ adversarial:
 
   - id: ADV-01
     question: "¿Cuál es el lineamiento vigente sobre X?"
-    must_not: "devolver un lineamiento con vigencia 'derogado' o 'en-revision' como si fuera vigente"
+    must_not: "devolver un lineamiento con valido_hasta ya pasado, o con estado 'en-revision', como si estuviera plenamente vigente"
     harm: "se cumple una norma muerta, o se incumple la viva"
     evidence: "heredada del borrador; sin respaldo de literatura propio. Solapa con ADV-08."
 
   - id: ADV-02
     question: "¿Qué decidimos sobre X?"
-    must_not: "devolver una decisión 'reemplazada' sin decir que fue reemplazada y por cuál"
+    must_not: "devolver una decisión con valido_hasta pasado sin decir que dejó de regir, ni por cuál fue reemplazada"
     harm: "se actúa sobre una decisión muerta creyéndola vigente"
     evidence: "heredada del borrador; ADV-08 y CQ-28 la respaldan indirectamente."
 
@@ -466,7 +728,7 @@ adversarial:
 
   - id: ADV-08
     question: "¿Cuál es la política vigente sobre Z?"
-    must_not: "responder desde un Lineamiento cuya vigencia expiró o que fue reemplazado, sin advertir el estado"
+    must_not: "responder desde un Lineamiento cuyo valido_hasta ya pasó, o que fue reemplazado, sin advertir el estado"
     harm: "lineamiento derogado presentado como vigente"
     evidence: "Controlling Authority Retrieval (arXiv 2604.14488): «standard retrieval systems fail on it structurally»; RAG «silent on supersession». NARA/GRS."
 
@@ -494,6 +756,45 @@ adversarial:
     harm: "decisión sin procedencia trazable; en auditoría o disputa no se puede sostener"
     evidence: "Provenance-aware research artifacts (arXiv 2604.16208): la pérdida de procedencia equivale a decaimiento del conocimiento. FACTUM (arXiv 2601.05866)."
 
+
+  - id: ADV-13
+    question: "¿Puede un entregable citar un documento que quien lo escribió nunca abrió?"
+    must_not: >-
+      emitir un entregable cuyas citas incluyan rutas no leídas durante la
+      sesión que lo produjo, o rutas que no existen en el bundle
+    harm: >-
+      una cita inventada es peor que una afirmación sin fuente: la afirmación
+      sin fuente se lee con desconfianza, la cita falsa se lee con confianza
+    evidence: >-
+      Zhu & Wu 2026, Definición 2: la disciplina de cita se impone por
+      construcción -- la interfaz del lector no ofrece canal para citar
+      material no abierto -- y el lector que no puede ensamblar el conjunto de
+      citas se abstiene. Lo que aquí es norma de prosa, allí es sintaxis.
+    note: >-
+      Solo la mitad estructural es automatizable (V22: la ruta citada resuelve
+      a un documento del bundle). «Solo se cita lo que se abrió» no lo ve el
+      validador, que no tiene la sesión; queda como regla del módulo de
+      consulta. Decirlo importa: esta adversarial NO se ejercita con SQL.
+      Cubre la deuda que kernel/AGENTS.md ya reconoce sobre `# Citations`:
+      «nada lo comprueba todavía».
+
+  - id: ADV-14
+    question: "¿Puede una inferencia de un agente presentarse con el mismo peso que un dato leído de una fuente?"
+    must_not: >-
+      devolver en la misma lista y sin distinción un documento con
+      procedencia=fuente y uno con procedencia=inferido que nadie ha verificado
+    harm: >-
+      es el modo de fallo que nombra P1: la inferencia contamina la verdad de
+      base. Una vez mezcladas, ninguna revisión posterior las separa, porque la
+      señal que las distinguía no se guardó
+    evidence: >-
+      Zhu & Wu 2026, §3.1, postulado P1 y Tabla 2: la memoria factual leída de
+      fuente y la experiencial inferida se segregan por tipo, con ciclos de
+      vida distintos.
+    note: >-
+      Depende de que CQ-52 se apruebe y `procedencia` exista. Aprobadas ambas el
+      2026-09-10. Se ejercita con V25 y con la regla del módulo de consulta, no
+      con SQL.
 
 # The cutting rule applied, type by type. A type with no CQ is not automatically
 # out: it may exist for structural reasons. What it may not do is go unexamined.
@@ -562,6 +863,54 @@ intake_corrections:
     - {cq: CQ-44, was: "status=vigente",   now: "status=stable",        why: "mismo enum que CQ-24"}
     - {cq: ADV-07, was: "Decision estado=vigente", now: "estado=aceptada", why: "mismo enum que CQ-27"}
 
+# Campos que un plan aprobado va a añadir y que el contrato todavía no declara.
+# test_roundtrip.py los acepta como válidos en `fields`; sin esta lista, una CQ
+# escrita por delante del contrato rompería el test. Cada línea desaparece
+# cuando su campo entra de verdad.
+#
+# pending-field: valido_desde              # T9, opción B: el intervalo de vigencia
+# pending-field: valido_hasta              # T9
+# pending-field: Lineamiento.estado        # T9: renombrado desde `vigencia`
+
+revision_3_corrections:
+  note: >-
+    Segunda ronda, al integrar el bloque Agent Zero el 2026-09-10. Verificadas
+    de forma mecánica contra kernel/schema/contract.json, igual que la primera.
+    Las decisiones 2, 3 y 4 del plan de implementación se tomaron con estas
+    cuatro correcciones sobre la mesa.
+  corrections:
+    - {cq: CQ-52, was: "campo común `origen`", now: "campo común `procedencia`", why: "`origen` ya lo declaran Iniciativa (enum) e Insumo (link) con significados distintos, y derived_files.GOALS.md agrupa por él"}
+    - {cq: ADV-14, was: "origen=fuente / origen=inferido", now: "procedencia=...", why: "mismo renombrado que CQ-52"}
+    - {cq: CQ-47, was: "fields: [fecha, proyecto, title] y la nota afirmaba que `fecha` existe en los cinco tipos", now: "fields incluye fecha-creacion y ultima-revision; la vista se genera por data_type: date", why: "Pregunta declara `fecha-creacion` y Plan `ultima-revision`. Seleccionar por el NOMBRE `fecha` omitiría dos de los cinco tipos EN SILENCIO. Es el mismo desajuste ya corregido en CQ-41"}
+    - {cq: CQ-48, was: "silencio sobre Lineamiento", now: "el alcance real queda escrito en la nota", why: "Lineamiento no declara `estado`, ni `reemplazada_por`, ni `proyecto`: sobre ese tipo la CQ no es respondible añadiendo solo las dos fechas"}
+    - {cq: CQ-51, was: "silencio sobre Lineamiento", now: "misma advertencia que CQ-48", why: "su criterio exige `reemplazada_por`, que Lineamiento no declara"}
+    - {cq: CQ-45, was: "sin posición sobre la clave `sql:`", now: "declarada la salvedad", why: "consulta log-consultas.md, que es markdown y no una tabla proyectada; T8 exige `sql:` a toda CQ"}
+    - {cq: CQ-46, was: "sin posición sobre la clave `sql:`", now: "declarada la salvedad", why: "misma razón que CQ-45"}
+    - {cq: CQ-45, was: "salvedad sobre `sql:` sin resolver", now: "el log se proyecta; lleva `sql:`", why: "decisión D-6 del 2026-09-10: formato declarado en el contrato y comprobado por V26; solo se proyectan los conteos, no el texto"}
+    - {cq: CQ-46, was: "misma salvedad", now: "misma resolución", why: "D-6"}
+    - {cq: CQ-46, was: "fields: [docs-abiertos, cuerpos-abiertos]", now: "+ cuerpos-citados", why: "métrica de eficiencia decidida el 2026-09-10: el tope se queda en 5 y lo que se mide es el desperdicio, cuerpos-citados/cuerpos-abiertos"}
+    - {cq: CQ-28, was: "criterion: estado=reemplazada", now: "valido_hasta no vacío", why: "decisión D-4 opción B: el intervalo es la fuente de «rigió o no», y `reemplazada` sale del enum de Decision.estado"}
+    - {cq: CQ-33, was: "fields: [area, vigencia, fuente]; vigencia=vigente", now: "estado + valido_hasta", why: "misma decisión: `Lineamiento.vigencia` se renombra a `estado` y `derogado` pasa a ser un valido_hasta pasado"}
+    - {cq: ADV-01, was: "vigencia derogado / en-revision", now: "valido_hasta pasado o estado en-revision", why: "misma decisión"}
+    - {cq: ADV-07, was: "decisión 'reemplazada'", now: "valido_hasta pasado", why: "misma decisión"}
+    - {cq: ADV-10, was: "cuya vigencia expiró", now: "cuyo valido_hasta ya pasó", why: "misma decisión"}
+  nota_de_vigencia: >-
+    Los criterios de CQ-28, CQ-33, ADV-01, ADV-07 y ADV-10 se reescribieron con
+    la decisión D-4 (opción B) y describen el contrato POSTERIOR a T9. Hasta que
+    T9 se implemente -- y T9 está bloqueado por T12, la auditoría de `Decision`
+    -- esas cinco se siguen respondiendo con el contrato actual:
+    `estado=reemplazada` en Decision y `vigencia=vigente` en Lineamiento. Se
+    reescribieron ya, y no al implementar, porque dejar el criterio apuntando a
+    un valor que se sabe condenado es la deriva que este archivo existe para
+    evitar.
+  aun_sin_comprobacion: >-
+    NADA parsea este archivo ni cruza `fields` contra `types`. Los ocho
+    desajustes de la primera ronda y los siete de esta se encontraron a mano.
+    El cruce -- todo campo de `fields` existe en al menos uno de los `types`
+    declarados, o es campo común -- da cero desajustes sobre las 32 preguntas y
+    cabe en unas quince líneas de test_roundtrip.py. Mientras no exista,
+    la consistencia de este archivo depende de que alguien la mire.
+
 corpus_reality_check:
   note: >-
     Contraste de las 24 CQs contra el cerebro real, medido con survey.py el
@@ -571,6 +920,14 @@ corpus_reality_check:
   responden_hoy: 11
   parciales: 5
   sin_datos: 8
+  alcance_del_recuento: >-
+    Los tres números de arriba miden las 24 PRIMERAS contra el cerebro real el
+    2026-08-31. No se han recalculado con el bloque Agent Zero, y no debe
+    hacerse en falso: las ocho nuevas dependen todas de campos que hoy no
+    existen -- `resumen`, `procedencia`, `valido_desde`/`valido_hasta` y las
+    columnas de log-consultas.md --, así que hoy ninguna responde. El recuento
+    se rehace tras la migración del paso 9, que es la pasada que crea esos
+    campos, y ese informe es parte de su criterio de aceptación.
   sin_datos_detalle: >-
     Ocho CQs (CQ-27, CQ-28, CQ-29, CQ-32, CQ-34, CQ-40, CQ-43) no tienen datos
     porque `Decision` tiene CERO documentos en el cerebro real, y CQ-36 porque
@@ -587,11 +944,16 @@ corpus_reality_check:
     adversariales (ADV-05, ADV-09, ADV-10, ADV-12) dependen de esos mismos
     campos y hoy tampoco son ejercitables.
   tipos_fuera_de_catalogo: >-
-    El cerebro real usa dos tipos que no están ni en el catálogo de v1 ni en
-    nuestro contrato: ModeloEntidad (10 documentos, con campo aggregate-root) y
-    ContratoAPI (1, con ruta-openapi y los dominios BIAN). Ninguna CQ los
-    contempla porque la investigación no sabía que existían. Decidir si entran
-    al contrato exige preguntas que los justifiquen, no solo su presencia.
+    El cerebro medido usa dos tipos propios que no están ni en el catálogo de v1
+    ni en nuestro contrato, con 11 documentos entre los dos. Son
+    PERSONALIZACIONES DE ESE USUARIO y quedan FUERA DEL ALCANCE de esta
+    implementación: no entran al contrato y ninguna CQ tiene que contemplarlos.
+    Sus nombres y sus campos no se reproducen aquí -- identifican al sector de
+    la organización donde se midió, y este archivo viaja en un starter público.
+    Lo que sí es un hallazgo y se conserva: que un cerebro real lleve tipos
+    propios VALIDA la decisión de tratar el tipo desconocido como aviso y no
+    como error (V4), que es lo que permite que el catálogo del kernel y las
+    extensiones de cada usuario convivan.
   glosario: >-
     Ninguna CQ lo sostiene, pero el cerebro real tiene 8 documentos Glosario.
     Cortarlo dejaría huérfanos documentos que alguien escribió a propósito.

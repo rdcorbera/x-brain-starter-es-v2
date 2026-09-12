@@ -25,7 +25,9 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -117,6 +119,84 @@ def cmd_govern(args) -> int:
     validator = Validator(contract, bundle)
     validator.run()
     governance_report(contract, validator)
+    return 0
+
+
+RAW_ROW = re.compile(
+    r"^\|\s*(?P<fecha>[^|]*?)\s*\|\s*(?P<archivo>[^|]*?)\s*\|"
+    r"\s*(?P<sha>[^|]*?)\s*\|\s*(?P<origen>[^|]*?)\s*\|\s*(?P<destino>[^|]*?)\s*\|\s*$")
+
+
+def sha256_of(path: Path) -> str:
+    """Hash a file in chunks: an original may be a 200 MB video."""
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def cmd_hash(args) -> int:
+    """Print the SHA-256 of one file, for the agent to write into the manifest.
+
+    Exists because the row is written by an agent and nothing else can hash a
+    binary for it: `./brain` only runs .py files, so there is no portable
+    one-liner to fall back on.
+    """
+    path = Path(args.path)
+    if not path.is_file():
+        raise SystemExit(f"error: no encuentro `{path}`.")
+    print(sha256_of(path))
+    return 0
+
+
+def cmd_verify_raw(args) -> int:
+    """Check every original in raw/ against the hash its manifest row declares.
+
+    `raw/` is immutable by convention -- three rules in its README and nothing
+    enforcing them. This is what makes the first one, `nada se edita`, a control
+    instead of a promise. It lives OUTSIDE `validate` on purpose: raw/ is not
+    part of the OKF bundle, and the validator's subject is the bundle.
+    """
+    root = Path(args.path)
+    manifest = root / "manifiesto.md"
+    if not manifest.is_file():
+        raise SystemExit(f"error: no encuentro `{manifest}`.")
+
+    rows = ok = 0
+    problems: list = []
+    for line in manifest.read_text(encoding="utf-8").splitlines():
+        match = RAW_ROW.match(line)
+        if not match or match.group("fecha").lower() in ("fecha", "") \
+                or set(match.group("fecha")) <= set("-: "):
+            continue                       # cabecera, separador o fila vacía
+        rows += 1
+        name, declared = match.group("archivo"), match.group("sha").strip()
+        name = re.sub(r"^\[|\]\(.*\)$", "", name).strip("`[] ")
+        target = root / name
+        if not target.is_file():
+            problems.append(f"  falta el original `{name}` que el manifiesto declara")
+        elif not declared or declared == "-":
+            problems.append(f"  `{name}` no declara SHA-256 en su fila")
+        elif sha256_of(target) != declared:
+            problems.append(f"  `{name}` CAMBIÓ: su contenido no da el SHA-256 declarado")
+        else:
+            ok += 1
+
+    huerfanos = sorted(
+        f.name for f in root.iterdir()
+        if f.is_file() and f.name not in ("manifiesto.md", "README.md")
+        and f.name not in manifest.read_text(encoding="utf-8"))
+    for name in huerfanos:
+        problems.append(f"  `{name}` está en raw/ y no tiene fila en el manifiesto")
+
+    if problems:
+        print(f"brain verify-raw {root}: {len(problems)} problema(s) sobre {rows} fila(s).\n")
+        print("\n".join(problems))
+        print("\nraw/ es inmutable: sus tres reglas están en raw/README.md. Un original que")
+        print("cambió no se corrige editándolo -- se investiga de dónde salió el cambio.")
+        return 1
+    print(f"brain verify-raw {root}: {ok} de {rows} originales íntegros.")
     return 0
 
 
@@ -376,6 +456,14 @@ def main() -> int:
     p.add_argument("type")
     p.add_argument("field", nargs="*", help="campo=valor, p.ej. proyecto=2026-q3-erp")
     p.set_defaults(func=cmd_place)
+
+    p = sub.add_parser("hash", help="SHA-256 de un archivo, para el manifiesto de raw/")
+    p.add_argument("path")
+    p.set_defaults(func=cmd_hash)
+
+    p = sub.add_parser("verify-raw", help="comprobar que los originales de raw/ no han cambiado")
+    p.add_argument("path", nargs="?", default="raw")
+    p.set_defaults(func=cmd_verify_raw)
 
     p = sub.add_parser("template", help="imprimir la plantilla de un tipo")
     p.add_argument("type")

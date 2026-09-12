@@ -82,9 +82,16 @@ AAAA-MM-DD-descripcion-uuid.ext
 **`raw/` es plano**: las carpetas del inbox no se replican ahí. Esa información no se pierde,
 vive en la columna «Destino en el cerebro» del manifiesto, que es exactamente para eso.
 
-Y se agrega su fila a `raw/manifiesto.md`. **Nada de `raw/` se edita ni se borra nunca**: es la
-fuente que el wiki cita, y junto al manifiesto es lo que permite reconstruir con
-`/x-reconstruir`.
+Y se agrega su fila a `raw/manifiesto.md`, **con el SHA-256 del original**:
+
+```bash
+./brain hash raw/<archivo>      # el valor que va en la columna SHA-256
+```
+
+**Nada de `raw/` se edita ni se borra nunca**: es la fuente que el wiki cita, y junto al
+manifiesto es lo que permite reconstruir con `/x-reconstruir`. El hash es lo que hace esa regla
+comprobable — al cerrar, `./brain verify-raw` dice si algún original cambió o si quedó un archivo
+sin fila.
 
 ---
 
@@ -202,4 +209,4 @@ decisión del usuario.
 | Registrar una decisión | `/x-decision`. Aquí solo se propone |
 | Re-planificar un proyecto | `/x-plan`. Aquí se actualizan filas, no se rehace el árbol de tareas |
 | Abrir o interpretar un binario | `./brain kernel/bin/to-markdown.py` |
-| Editar, renombrar o borrar algo de `raw/` | Nadie. Nunca |
+| Editar, renombrar o borrar algo de `raw/` | Nadie. Nunca — y `./brain verify-raw` lo detecta |

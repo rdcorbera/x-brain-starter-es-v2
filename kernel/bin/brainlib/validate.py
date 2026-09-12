@@ -67,6 +67,7 @@ CHECKS = {
     "V19": ("profile", "el documento está en una ubicación declarada para su tipo"),
     "V20": ("profile", "las referencias por clave resuelven a un documento existente"),
     "V21": ("profile", "`periodo` sigue el formato declarado"),
+    "V26": ("profile", "las líneas de un log con formato declarado lo cumplen"),
 }
 
 
@@ -259,6 +260,7 @@ class Validator:
                 if match and match.group(1) == "##" and not DATE_RE.match(match.group(2).split()[0]):
                     self.add("V3", doc.rel,
                              f"encabezado de log `{match.group(2)}` no es ISO YYYY-MM-DD")
+            self.check_log_lines(doc)
         elif fmt == "index":
             is_root = doc.path.parent.resolve() == self.bundle.resolve()
             if doc.has_frontmatter and not is_root:
@@ -269,6 +271,38 @@ class Validator:
                 if extra:
                     self.add("V3", doc.rel,
                              f"el index.md raíz solo admite okf_version; sobra: {', '.join(sorted(extra))}")
+
+    def check_log_lines(self, doc: Document) -> None:
+        """A log whose lines get parsed is an interface, not prose.
+
+        `log-consultas.md` is read back by the cut-2 projector so CQ-45 and
+        CQ-46 can carry a `sql:` key like every other competency question, and
+        that turns its line into a contract. The shape lives in
+        `reserved_files[...].line_format`, never here: the file that declares
+        the format is the file that declares the rule.
+        """
+        spec = self.contract.reserved.get(doc.path.name, {}).get("line_format")
+        if not spec or not spec.get("pattern"):
+            return
+        pattern = re.compile(spec["pattern"])
+        for number, line in enumerate(doc.lines, start=1):
+            if not line.startswith("- "):
+                continue
+            match = pattern.match(line.rstrip())
+            if match is None:
+                self.add("V26", doc.rel,
+                         "la línea no sigue el formato declarado "
+                         f"(ejemplo: `{spec.get('ejemplo_es', '')}`)", line=number)
+                continue
+            fields = match.groupdict()
+            # The one thing a regex cannot express, and the one ADV-13 forbids:
+            # citing more than was opened.
+            if "citados" in fields and "completos" in fields:
+                if int(fields["citados"]) > int(fields["completos"]):
+                    self.add("V26", doc.rel,
+                             f"`citados` ({fields['citados']}) supera a `completos` "
+                             f"({fields['completos']}): se cita lo que no se abrió",
+                             line=number)
 
     def check_frontmatter(self, doc: Document, okf_only: bool = False) -> None:
         if doc.parse_error:

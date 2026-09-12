@@ -33,11 +33,11 @@ que faltaba.
 ### La capa determinista: `kernel/bin/brain.py`
 
 Nunca llama a un modelo, no tiene dependencias (stdlib pura, **Python 3.11+**) y es
-idempotente. Diez subcomandos; los que cambian el día a día:
+idempotente. Doce subcomandos; los que cambian el día a día:
 
 - **`init`** — materializa un cerebro: estructura, esquema portable, índices y derivados. El
   starter ya no versiona un `cerebro/` con TODOs: llega vacío y esto lo construye.
-- **`validate`** — 20 comprobaciones en dos niveles (OKF / perfil), porque OKF es
+- **`validate`** — 22 comprobaciones en dos niveles (OKF / perfil), porque OKF es
   deliberadamente permisivo y un validador estricto sobre él no sería conformante.
   **`--fix`** repara lo mecánico *preservando el significado, y verificándolo*: reparsea cada
   línea de frontmatter antes de escribirla, y nunca reescribe lo que redactó una persona.

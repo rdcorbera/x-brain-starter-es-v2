@@ -98,9 +98,10 @@ reabras decisiones ya cerradas sin consultar la bitácora.
 | `tmp/BITACORA.md` | Las decisiones cerradas con su razón y lo que se descartó | Antes de reabrir cualquier decisión de diseño |
 | `tmp/inventario-reglas-v1.md` | Regla por regla de la prosa de v1, con su veredicto: sustituida, reducida o sobrevive | Al escribir o revisar prosa del kernel, y al construir los módulos |
 | `tmp/plan-implementacion-x-brain-v2.md` | Propuesta del equipo. **Insumo, no plan** | Al retomar la proyección, hechos atómicos o capa semántica (cortes 2–3). Ojo: propone DuckDB, y el motor se decidió SQLite |
+| `tmp/plan-agent-zero-x-brain-v2.md` | **Plan de implementación vigente (rev. 8)**: las ideas del paper Agent Zero llevadas a tareas con criterio de aceptación, contrastadas contra el contrato real. **Gobierna la implementación**; sus siete decisiones están cerradas | Antes de tocar el contrato, el corte 2 o la migración del paso 9 |
 | `tmp/competency-questions-research.md` | La revisión de literatura de la que salen las 24 CQs | Antes de tocar `competency-questions.yml`, o al discutir si un tipo se sostiene |
 | `tmp/encargo-competency-questions.md` | El encargo con el que se pidieron las 24 CQs. **Formato de referencia** para cualquier encargo nuevo | Al escribir un encargo de investigación |
-| `tmp/encargo-memoria-largo-plazo.md` | **Encargo vivo**: memoria a largo plazo a coste de tokens casi cero. Trae el hallazgo de que encontrar es el 5% del coste de una consulta y leer el 95% | Antes de arrancar el corte 2, y al discutir hechos atómicos |
+| `tmp/encargo-memoria-largo-plazo.md` | **RETIRADO el 2026-09-11.** No se mandan más encargos al equipo de investigación externo. Se conserva como registro; lo que pedía y no estaba respondido —el olvido y la capa de hechos— vive ahora en las preguntas abiertas de `tmp/PLAN.md` | Solo como registro histórico |
 | `tmp/cerebro-survey.json` | La medición del cerebro real: 301 documentos, veredicto A/B, tipos, salud del frontmatter | Al dimensionar la migración (paso 9) |
 | `tmp/sqlite-results.json` | La sonda en la máquina de destino: SQLite 3.50.4, las 8 capacidades en verde | Al arrancar el corte 2 |
 | `tmp/rediseño second brain primera investigacion.md` | Búsqueda agéntica, grafos ligeros, OKF v0.2, progressive disclosure | Al evaluar recuperación a escala |
