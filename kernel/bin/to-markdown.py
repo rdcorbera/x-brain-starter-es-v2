@@ -799,6 +799,14 @@ def build_document(path: Path, rows: int, source: Optional[str],
              f"title: {_title_from_filename(path)}",
              f"description: {what} recibido, convertido a markdown desde "
              f"{path.name}; pendiente de resumir al integrarlo.",
+             # A converted original is `fuente`: read from a source, not
+             # inferred. The summary is the one field this script cannot write
+             # -- it needs a model, and this layer never calls one -- so it
+             # leaves a marker for the agent, exactly as it does for
+             # `description`. /x-procesar-inbox orders replacing both.
+             f"resumen: PENDIENTE. Redactar al integrar qué dice {path.name} "
+             "y qué decide a quien lo lee.",
+             "procedencia: fuente",
              "tags: []",
              "classification: confidential",
              f"generated: {{by: process:to-markdown, at: {now}}}",

@@ -1,7 +1,7 @@
 {
   "note": "Single source of truth for this brain's data contract. Templates, JSON Schemas, the catalog, the portable bundle schema, the skill stubs, the directory indexes, the derived indexes and (in cut 2) the SQLite DDL are all GENERATED from this file. Never edit a generated artifact; edit this and run `brain generate`. READING ORDER -- the top-level keys are ordered as a narrative, separated by blank lines, rather than nested into groups: (1) what this contract is -- note, versions, provenance, governance, and the policies it is written under; (2) the vocabulary the schema is written in -- data types, actors, and the classification ladder, each defined before it is used; (3) the schema itself -- common_fields and types, which are 59% of the file; (4) the files it produces -- reserved, exempt, derived, and the portable bundle schema. Grouping these into nested objects was considered and rejected: the groups are wildly uneven, the boundaries are genuinely ambiguous (classification is both vocabulary and policy), and nesting would lengthen every access path and every provenance entry for no functional gain.",
   "okf_version": "0.2",
-  "profile_version": 1,
+  "profile_version": 2,
 
   "provenance": {
     "note": "What comes from the OKF specification and what is ours. This block exists because the file used to be named okf.json, which implied the whole thing was the standard -- it is not, and the confusion had a cost: it was unclear what to update when a new OKF version ships. The answer is now exact: the items under `from_okf`, and nothing else.",
@@ -21,7 +21,7 @@
       "common_fields.stale_after"
     ],
     "from_v1": ["common_fields.timestamp"],
-    "from_x_brain": ["common_fields.classification"],
+    "from_x_brain": ["common_fields.classification", "common_fields.resumen", "common_fields.procedencia"],
     "ours": "Everything not listed above. OKF leaves `type` producer-defined and takes no position on a field-level type system, data classification, stewardship, derived files, severity policy or generation -- which is most of this file by volume. Our additions extend the standard; they never contradict it, and the validator keeps the two levels apart so a bundle stays OKF-conformant even when it fails our profile.",
     "completeness_rule": "Every entry of `common_fields` must appear in exactly one of the three lists. A new common field therefore forces a conscious answer to 'is this the standard's or ours?', which is the question the old filename made impossible to answer. Enforced by kernel/tests/test_roundtrip.py."
   },
@@ -44,6 +44,19 @@
     "placeholders": "Every `{name}` in a path must be a field the type declares. Enforced by kernel/tests/test_roundtrip.py -- making locations routable is what exposed that Insumo, Playbook and Iniciativa itself referenced `{proyecto}` without declaring it.",
     "ambiguity": "If exactly one pattern applies, `brain place` answers. If several do, it returns the candidates and the agent chooses. The tool removes the prose, never the judgement.",
     "roles": { "active": "destino de un documento nuevo", "archive": "dónde queda tras /x-cierre-periodo; válido para validar, nunca para enrutar" }
+  },
+
+  "citation_rules": {
+    "note": "The citation lock, structural half. OKF is explicit that consumers MUST tolerate broken links, and V10 honours that: a broken link in the BODY is INFO, because it marks knowledge not yet written. A broken link under the citations heading is a different act. A citation asserts that a source exists and supports a claim, so a citation that resolves to nothing is a FABRICATED citation -- and a fabricated citation is worse than an unsourced claim, because the unsourced claim is read with suspicion and the false citation is read with trust (ADV-13). Not a heritage case to tolerate while the corpus migrates: a defect at any scale. The `/raw/` prefix is exempt, as everywhere: it points outside the bundle on purpose, and a brain shared without its sources has those links broken by design -- `brain verify-raw` is what checks those. The other half of the lock -- that a document may only cite what its author actually opened -- the validator cannot see, because it has no session. That half lives in the skill modules, and is stated below so the rule is written once.",
+    "heading": "Citations",
+    "severity": "error",
+    "enforced_by": "V22",
+    "agent_rules_es": [
+      "La sección de fuentes se arma desde la lista de documentos que ABRISTE en esta sesión, no desde lo que recuerdes haber leído.",
+      "Solo se cita lo que se abrió. Si no puedes armar la lista, no respondas afirmando: dilo, y abre una `Pregunta`.",
+      "Una cita apunta a un documento que existe. Si el documento que querías citar no está escrito todavía, eso es un hueco declarado, no una cita.",
+      "El puntero `/raw/...` es la excepción: apunta fuera del bundle a propósito, y se comprueba con `./brain verify-raw`."
+    ]
   },
 
   "frontmatter_rules": {
@@ -206,6 +219,19 @@
       "note": "OKF v0.2. A concept is stale once now >= stale_after. Turns obsolescence from a judgement call into a date comparison."
     },
 
+    "resumen": {
+      "data_type": "text", "required": true,
+      "placeholder": "panorama en ~600 caracteres: qué dice este documento y qué decide quien lo lee",
+      "hint": "el nivel intermedio de lectura: lo que permite DESCARTAR un documento sin abrirlo",
+      "note": "L1 of the read budget (`read_budget`). Deliberately AUTHORED, not mechanically extracted from headings: a table of contents does not let a reader discard a document and an overview does. This is the field that attacks the 95% -- survey.py measured 3.285 tokens to find candidates and 61.731 to open them, so orientation is where the cost is. Written by the agent at ingest under human review; the deterministic layer only ever writes a MECHANICAL one, for generated indexes, where the summary genuinely is mechanical. Its staleness check (V23, against `resumen_hash`) arrives with T2: until then the field exists and nothing guards it drifting from the body."
+    },
+    "procedencia": {
+      "data_type": "enum",
+      "values": ["fuente", "dialogo", "inferido", "manual", "derivado"],
+      "required": true,
+      "hint": "cómo entró la afirmación: leída de un insumo, dicha en una conversación, inferida por un agente, escrita por una persona, o derivada mecánicamente",
+      "note": "How the assertion ENTERED, which `actors` does not answer: it says WHO wrote the document. An agent transcribing a PDF and an agent inferring from a discussion are the same actor with different reliability, and today the system stores them identically -- CQ-52. Named `procedencia` and not `origen` because that key is already taken twice with two different data types (`Iniciativa.origen` is an enum, `Insumo.origen` a /raw/ link) and `derived_files.GOALS.md` groups by it. `derivado` is the fifth value and was not in the original four: generated indexes assert nothing of their own, and calling them `inferido` would poison the very distinction this field exists to draw -- inference is fallible, a derived index is deterministic."
+    },
     "timestamp": {
       "data_type": "datetime",
       "required": false,
@@ -531,6 +557,7 @@
     "note": "Regenerated deterministically by `brain derive`. These grow with the brain; having the model rewrite them by hand is Slope A, the cost this contract exists to remove. Each entry declares what to select, how to filter, sort and render, so the engine knows nothing about this brain's types by name. Each also declares the `type` its generated frontmatter carries, so a derived file is fully OKF-conformant with nobody maintaining it.",
 
     "PREGUNTAS-ABIERTAS.md": {
+      "resumen": "Índice generado de todas las preguntas sin resolver del cerebro, bloqueantes primero y luego por antigüedad, cada una con su responsable y los días que lleva abierta. Sirve para saber a quién perseguir hoy y qué llevar a cada reunión.",
       "type": "Indice",
       "title": "Preguntas abiertas",
       "description": "Índice global de preguntas sin resolver, ordenadas por bloqueo y antigüedad.",
@@ -559,6 +586,7 @@
       "note": "Introducido por el kernel 1.4.0 de v1. Su sección «Sin proyecto» además agrega los pendientes de las fichas Persona, así que tiene DOS fuentes: otra cosa que el esquema actual de derived_files no expresa."
     },
     "GOALS.md": {
+      "resumen": "Índice generado de los objetivos del periodo en curso, agrupados por origen: proyectos asignados, objetivos personales y objetivos del equipo. Se construye desde el campo `origen` de cada Iniciativa activa; nadie lo escribe a mano.",
       "type": "Indice",
       "title": "Objetivos del periodo",
       "description": "Los objetivos del periodo en curso, agrupados por origen.",
@@ -585,6 +613,7 @@
       "note": "v1 shipped this as a hand-written Playbook whose three blocks the model rewrote on every /x-nueva-iniciativa and every /x-actualizacion-semanal -- Slope A in a file the survey never counted. It needs no new type: `Iniciativa.origen` is already an enum of exactly those three blocks, and v1's own module says so (`el origen define a qué bloque de GOALS.md se engancha`). `from_role: active` is what makes 'the period in course' derivable without writing the period down: an initiative leaves it by being moved to the archive, and both locations are already declared."
     },
     "02-areas/personas/ORGANIGRAMA.md": {
+      "resumen": "Índice generado de la estructura de reporte de la organización, construido desde el campo `reporta-a` de cada ficha Persona. Sirve para ubicar a alguien y para encontrar al responsable de un tema sin preguntarlo.",
       "type": "Diagrama",
       "title": "Organigrama",
       "description": "Quién reporta a quién, derivado del campo reporta-a de cada ficha Persona.",
@@ -606,6 +635,7 @@
     "note": "The single generated human-readable spec. A separate kernel-side CATALOGO.md existed and was deleted: it carried the same tables, and its only real advantage -- richer columns -- was an accident of improving one file and not the other. One derived spec, living where the documents are. Content of the portable ESQUEMA.md written into the bundle. It lives here rather than in code because it is content, not configuration: it is what someone who receives the `cerebro/` folder reads to understand it without the kernel. Spanish, like the rest of the bundle.",
     "path": "ESQUEMA.md",
     "type": "Indice",
+    "resumen": "Catálogo generado de los tipos de documento de este cerebro, con sus campos, sus valores admitidos, las convenciones de lectura y la clasificación de datos. Es lo que hace la carpeta autodescriptiva: quien la reciba puede entenderla sin el sistema que la produjo.",
     "title": "Esquema de datos de este cerebro",
     "description": "Cómo leer esta base de conocimiento: tipos, campos, convenciones y clasificación.",
     "intro": "Este archivo hace al cerebro **autodescriptivo y portable**: cualquier persona o sistema que reciba la carpeta `cerebro/` puede entender su base de conocimiento leyendo esto, sin necesitar el kernel. Se genera desde el contrato; no se edita a mano.",

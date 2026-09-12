@@ -73,6 +73,19 @@
       "type": "string",
       "format": "date-time"
     },
+    "resumen": {
+      "type": "string"
+    },
+    "procedencia": {
+      "type": "string",
+      "enum": [
+        "fuente",
+        "dialogo",
+        "inferido",
+        "manual",
+        "derivado"
+      ]
+    },
     "area": {
       "type": "string"
     },
@@ -95,6 +108,8 @@
     "tags",
     "classification",
     "generated",
+    "resumen",
+    "procedencia",
     "area",
     "fuente",
     "vigencia"

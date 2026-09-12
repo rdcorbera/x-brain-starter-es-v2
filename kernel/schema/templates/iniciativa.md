@@ -6,6 +6,8 @@ description: <qué es y por qué importa, en una oración>
 tags: []
 classification: internal          # mínimo de Iniciativa: internal
 generated: {by: <by>, at: <at>}
+resumen: "<panorama en ~600 caracteres: qué dice este documento y qué decide quien lo lee>"
+procedencia: fuente          # fuente | dialogo | inferido | manual | derivado
 proyecto: <slug de la carpeta, ej. 2026-q3-migracion-erp>
 origen: proyecto-asignado          # proyecto-asignado | objetivo-personal | objetivo-equipo
 periodo: <según el formato declarado, ej. 2026-Q3>

@@ -66,6 +66,13 @@ no está en el cerebro.
 
 - **Toda afirmación con su fuente**, como enlace bundle-relativo al documento, y a la decisión o
   la reunión concreta cuando la haya. Una respuesta sin enlaces no se distingue de una inventada.
+- **La lista de fuentes se arma desde lo que abriste, no desde lo que recuerdes.** Lleva la cuenta
+  de los documentos que abriste en esta sesión y construye `# Citations` **desde esa lista**. Es la
+  única forma de que una cita no pueda salir de la memoria del modelo. Si no puedes armarla, **no
+  respondas afirmando**: dilo y abre una `Pregunta`.
+- **Solo se cita lo que existe.** Una cita que no resuelve a un documento del cerebro es una cita
+  fabricada, y **V22 la rechaza**. Si el documento que querías citar no está escrito todavía, eso
+  es un hueco declarado, no una cita.
 - **Las contradicciones se dicen, no se resuelven en silencio.** Si dos páginas se contradicen,
   van las dos con sus fuentes y se señala cuál es más reciente. Elegir una por el usuario es
   quitarle la decisión sin avisarle.
@@ -141,11 +148,12 @@ pregunta. Una línea mal formada no es un detalle de estilo: es un dato perdido.
 |---|---|
 | `<N>` | Cuántos documentos se miraron en total |
 | `<C>` | Cuántos se abrieron **enteros** |
-| `<U>` | Cuántos de esos completos acabaron **sosteniendo una afirmación** de la respuesta |
+| `<U>` | Cuántos de esos completos acabaron **sosteniendo una afirmación** de la respuesta — es decir, cuántos entraron en `# Citations` |
 | `<modo>` | `directa` · `acotada` · `abierta`, el de la Fase 0 |
 
-**`<U>` nunca puede superar a `<C>`**: citar lo que no se abrió es lo que prohíbe la regla de
-citas, y V26 lo rechaza.
+**`<U>` no se cuenta a ojo: es el tamaño de la lista de citas**, cruzada con las aperturas
+completas. Por eso `<U>` nunca puede superar a `<C>` —citar lo que no se abrió es lo que prohíbe
+la regla de citas— y **V26 lo rechaza** si ocurre.
 
 No es burocracia: **v1 no registraba ninguna pregunta**, y sin eso hay tres cosas que no se
 pueden saber mirando atrás — con qué frecuencia se pregunta cada cosa, cuántas consultas hay por
@@ -173,3 +181,4 @@ pero la línea vive en el cerebro y se comparte con él.
 | Actualizar el `CONTEXT.md` o el `PLAN.md` de un proyecto con lo aprendido | `/x-actualizacion-semanal` o `/x-plan`. Consultar no reescribe el proyecto |
 | Archivar cualquier respuesta | Solo las que tienen síntesis. Copiar un dato ya escrito crea una segunda fuente de verdad |
 | Decidir el modo después de buscar | La Fase 0. Elegirlo a posteriori describe lo que pasó, no lo decide |
+| Citar de memoria | La lista de aperturas. Una cita que no salga de ahí no se escribe |

@@ -94,6 +94,7 @@ reabras decisiones ya cerradas sin consultar la bitácora.
 
 | Archivo | Qué es | Cuándo leerlo |
 |---|---|---|
+| `tmp/ESTADO-Y-PRUEBAS.md` | **Lo primero que hay que leer ahora.** El estado exacto de lo construido, qué NO existe, cómo montar el entorno de pruebas y qué probar por orden de valor. La implementación está detenida a propósito | **Al retomar, antes que nada** |
 | `tmp/PLAN.md` | **El plan vigente.** Diagnóstico de las dos pendientes, los 10 pasos con su estado, riesgos y preguntas abiertas | Siempre, al retomar. Si algo lo contradice, manda este |
 | `tmp/BITACORA.md` | Las decisiones cerradas con su razón y lo que se descartó | Antes de reabrir cualquier decisión de diseño |
 | `tmp/inventario-reglas-v1.md` | Regla por regla de la prosa de v1, con su veredicto: sustituida, reducida o sobrevive | Al escribir o revisar prosa del kernel, y al construir los módulos |
@@ -117,6 +118,7 @@ reabras decisiones ya cerradas sin consultar la bitácora.
    ./brain generate                         # los artefactos generados, al día
    git diff --exit-code -- kernel/schema .claude .github/prompts   # no cambian al regenerar
    git status --porcelain -- cerebro        # vacío: el starter no versiona conocimiento
+   ./brain verify-raw                       # los originales de raw/ no han cambiado
    ```
    El `git diff` va **acotado a lo generado**, no al árbol entero: mientras haya trabajo sin
    commitear, un `--exit-code` a secas falla siempre y deja de informar.
@@ -129,7 +131,10 @@ Viven en `tmp/PLAN.md`, junto a los riesgos. Las que bloquean trabajo hoy:
 - La **taxonomía de clasificación** es una propuesta nuestra: validarla con gobierno de datos
   **antes** de clasificar el corpus, porque si la rechazan después hay que reclasificar todo.
 - **`Decision` tiene cero documentos en el cerebro real** (R8), y es el tipo que más competency
-  questions sostienen. Diferido a propósito al paso 8: hasta que haya skills que probar con
-  datos ficticios no hay forma de distinguir «no se registran» de «se registran como otro tipo».
+  questions sostienen. **Y ahora tiene fecha de caducidad:** `/x-decision` existe desde el
+  2026-09-11 y `/x-procesar-inbox` lo propone al detectar una decisión en una fuente, así que en
+  cuanto el ritual se use sobre el cerebro real ya no se podrá distinguir «no se registraban» de
+  «no se registraban porque nadie lo pedía». Probar en un cerebro temporal no contamina nada;
+  usarlo sobre el de producción, sí. **Preguntar antes a quien lo opera.**
 - ~~**El formato de `periodo` vive en prosa**~~ **Cerrado (2026-09-03)**: vive en
   `cerebro/schema.json` como `period_format`, con tres formas del kernel, y lo comprueba V21.

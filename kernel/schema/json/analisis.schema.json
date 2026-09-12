@@ -73,6 +73,19 @@
       "type": "string",
       "format": "date-time"
     },
+    "resumen": {
+      "type": "string"
+    },
+    "procedencia": {
+      "type": "string",
+      "enum": [
+        "fuente",
+        "dialogo",
+        "inferido",
+        "manual",
+        "derivado"
+      ]
+    },
     "proyecto": {
       "type": "string"
     },
@@ -88,6 +101,8 @@
     "tags",
     "classification",
     "generated",
+    "resumen",
+    "procedencia",
     "proyecto",
     "fecha"
   ]

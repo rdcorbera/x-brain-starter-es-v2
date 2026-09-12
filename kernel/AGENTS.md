@@ -28,6 +28,11 @@ que falta. El lanzador prueba `py -3`, `python3` y `python` en ese orden, así q
 ocurre una vez y de forma determinista en lugar de ser una regla que recordar por sistema.
 También corre los demás scripts: `./brain kernel/bin/to-markdown.py <archivo>`.
 
+**Todo documento lleva `resumen`.** Es el nivel intermedio de lectura: ~600 caracteres que
+permiten **descartar** un documento sin abrirlo. No es una tabla de contenidos ni la primera
+frase de cada sección — eso no deja descartar nada. Se escribe al ingerir, y es lo que evita que
+responder una pregunta cueste abrir cinco documentos enteros.
+
 **La regla que ordena tu trabajo: si hay un comando, se usa el comando.** No porque sea más
 elegante, sino porque el modo alternativo —leer una especificación y escribir a mano— cuesta
 tokens y se equivoca. `./brain template Reunion` cuesta unos 200 tokens; leer el esquema
@@ -131,7 +136,14 @@ Dos convenciones que sí escribes tú, porque ninguna herramienta las genera:
   El prefijo `/raw/...` es un **puntero reservado que apunta FUERA del bundle**; si un cerebro
   se comparte sin sus fuentes, esos enlaces quedan rotos y es aceptable.
 - **`# Citations`.** Cuando un documento afirma algo con fuente, lista las fuentes al final,
-  numeradas. *Nada lo comprueba todavía* — depende de ti.
+  numeradas. **Y aquí un enlace roto sí es un error** (V22): un enlace del cuerpo marca
+  conocimiento aún no escrito, pero una **cita afirma que una fuente existe y sostiene algo**, así
+  que una cita que no resuelve es una cita fabricada — y esa se lee con confianza, que es lo que la
+  hace peor que una afirmación sin fuente. El puntero `/raw/...` queda exento, como siempre.
+  **La otra mitad de la regla no la ve ningún validador, porque no tiene la sesión:** la sección
+  de fuentes se arma **desde la lista de documentos que abriste**, no desde lo que creas haber
+  leído. Si no puedes armarla, no respondas afirmando: dilo y abre una `Pregunta`. Está escrita en
+  `citation_rules.agent_rules_es` del contrato.
 
 Y una que es disciplina pura: **`log.md` por alcance — quien escribe, loguea.** Hay uno global
 en `cerebro/` y uno por proyecto, agrupados por fecha con `## AAAA-MM-DD` y lo más reciente
@@ -182,7 +194,11 @@ La política que no se ejecuta no es un control. Estas son ejecutables.
   `Persona` —que se verifica— o un nombre en texto libre, que se tolera y se reporta hasta
   resolverse (V17).
 - **Confianza.** `generated` frente a `verified`: que *«esto lo escribió un agente y nadie lo
-  revisó»* sea consultable, y no una suposición.
+  revisó»* sea consultable, y no una suposición. Y **`procedencia`**, que responde lo que
+  `generated` no puede: *cómo entró* la afirmación — `fuente` si se leyó de un insumo, `dialogo`
+  si se dijo en una reunión, `inferido` si la dedujo un agente, `manual` si la escribió una
+  persona, `derivado` si la computó el generador. Un agente transcribiendo un PDF y un agente
+  infiriendo de una discusión son el mismo actor con fiabilidad distinta.
 
 **Lo que ninguna comprobación puede saber va en `cerebro/PERFIL.md`:** qué nombres, qué
 sistemas o qué asuntos no entran en este cerebro. Y por encima de todo — **nunca almacenes
@@ -262,7 +278,7 @@ x-brain/
 │   │   │   ├── const.py          ←   el vocabulario compartido
 │   │   │   ├── parse.py          ←   LEER: OKF-YAML, documentos, contrato, moldes
 │   │   │   ├── generate.py       ←   ESCRIBIR: plantillas, índices, derivados, stubs
-│   │   │   ├── validate.py       ←   COMPROBAR: los 22 checks, en dos niveles
+│   │   │   ├── validate.py       ←   COMPROBAR: los 23 checks, en dos niveles
 │   │   │   └── report.py         ←   RENDIR: lo que los otros tres encontraron
 │   │   ├── to-markdown.py         ← insumos binarios → markdown (cero tokens)
 │   │   ├── survey.py             ← preflight: dónde se van los tokens
@@ -298,6 +314,7 @@ frontmatter de cada módulo con `./brain stubs`.
 | `/x-nueva-iniciativa` | Abre una iniciativa con su `CONTEXT.md`, su `PLAN.md` y la documentación inicial procesada. `GOALS.md` se genera solo |
 | `/x-consultar` | Responde con lo que hay en el cerebro y su fuente. Ofrece archivar la respuesta si hubo síntesis, y registra la consulta |
 | `/x-procesar-inbox` | El ritual diario: archiva el original en `raw/`, lo convierte, lo integra en todas las páginas que toca y vacía el inbox |
+| `/x-decision` | Registra o delibera una decisión, cruzándola contra las decisiones previas, los lineamientos y las fichas de sistema |
 
 <!-- TODO: las filas restantes se agregan al escribir los módulos que faltan. -->
 

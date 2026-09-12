@@ -289,6 +289,14 @@ def _derived_frontmatter(contract: Contract, name: str) -> List[str]:
         lines.append(f"title: {quote_scalar(spec['title'])}")
     if spec.get("description"):
         lines.append(f"description: {quote_scalar(spec['description'])}")
+    # `resumen` is required of every document, and a generated index is a
+    # document. Its summary is the one case the deterministic layer may write
+    # itself, because for an index the overview genuinely IS mechanical -- and
+    # `procedencia: derivado` says exactly that: nothing here was read, said or
+    # inferred; it was computed from other documents.
+    if spec.get("resumen"):
+        lines.append(f"resumen: {quote_scalar(spec['resumen'])}")
+    lines.append("procedencia: derivado")
     for key, value in spec.get("fields", {}).items():
         lines.append(f"{key}: {value}")
     if "version" in contract.fields_for(spec.get("type", "")):
@@ -637,6 +645,8 @@ def bundle_schema_frontmatter(contract: Contract) -> str:
         "---", f"type: {spec.get('type', 'Indice')}",
         f"title: {quote_scalar(spec.get('title', 'Esquema'))}",
         f"description: {quote_scalar(spec.get('description', ''))}",
+        f"resumen: {quote_scalar(spec.get('resumen', ''))}",
+        "procedencia: derivado",
         f"classification: {contract.classification.get('default_min', 'internal')}",
         "tags: [generado, esquema]",
         f"generated: {{by: process:brain-generate, at: {stamp}}}",

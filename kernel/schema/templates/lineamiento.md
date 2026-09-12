@@ -6,6 +6,8 @@ description: <qué es y por qué importa, en una oración>
 tags: []
 classification: internal          # mínimo de Lineamiento: internal
 generated: {by: <by>, at: <at>}
+resumen: "<panorama en ~600 caracteres: qué dice este documento y qué decide quien lo lee>"
+procedencia: fuente          # fuente | dialogo | inferido | manual | derivado
 area: <nombre del área en /02-areas/>
 fuente: <quién lo definió — enlace a ficha, comité o área>
 vigencia: vigente          # vigente | en-revision | derogado

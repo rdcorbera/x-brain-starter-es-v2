@@ -67,6 +67,7 @@ CHECKS = {
     "V19": ("profile", "el documento está en una ubicación declarada para su tipo"),
     "V20": ("profile", "las referencias por clave resuelven a un documento existente"),
     "V21": ("profile", "`periodo` sigue el formato declarado"),
+    "V22": ("profile", "toda cita resuelve a un documento del bundle"),
     "V26": ("profile", "las líneas de un log con formato declarado lo cumplen"),
 }
 
@@ -527,7 +528,30 @@ class Validator:
                 self.add("V9", doc.rel, f"placeholder sin rellenar en `{name}`")
                 return
 
+    def citation_lines(self, doc: Document) -> set:
+        """Line numbers that fall under the citations heading.
+
+        Which heading it is comes from `citation_rules.heading`, not from here:
+        the same reason V26 reads its pattern from the contract.
+        """
+        rules = self.contract.data.get("citation_rules", {})
+        wanted = rules.get("heading")
+        if not wanted:
+            return set()
+        inside, out = False, set()
+        for line_no, line in doc.body_lines():
+            match = HEADING_RE.match(line)
+            if match:
+                inside = match.group(2).strip() == wanted
+                continue
+            if inside:
+                out.add(line_no)
+        return out
+
     def check_links(self, doc: Document) -> None:
+        cited = self.citation_lines(doc)
+        severity_cita = self.contract.data.get(
+            "citation_rules", {}).get("severity", ERROR)
         for line_no, target in doc.links():
             if target.startswith(("http://", "https://", "mailto:", "#")):
                 continue
@@ -536,10 +560,20 @@ class Validator:
             if target.startswith("/"):
                 resolved = self.bundle / target.lstrip("/").split("#")[0]
                 if not resolved.exists():
-                    # OKF: "consumers MUST tolerate broken links" -- they mark
-                    # knowledge not yet written. Informational, never an error.
-                    self.add("V10", doc.rel, f"enlace sin destino: {target}",
-                             severity=INFO, line=line_no)
+                    if line_no in cited:
+                        # A citation is not a link: it ASSERTS that a source
+                        # exists and supports a claim. One that resolves to
+                        # nothing is fabricated, and a fabricated citation is
+                        # read with trust -- which is why it outranks an
+                        # unsourced claim as a defect. See `citation_rules`.
+                        self.add("V22", doc.rel,
+                                 f"cita sin destino: {target}",
+                                 severity=severity_cita, line=line_no)
+                    else:
+                        # OKF: "consumers MUST tolerate broken links" -- they
+                        # mark knowledge not yet written. Informational.
+                        self.add("V10", doc.rel, f"enlace sin destino: {target}",
+                                 severity=INFO, line=line_no)
             elif "://" in target:
                 self.add("V10", doc.rel, f"enlace malformado: {target}",
                          severity=ERROR, line=line_no)

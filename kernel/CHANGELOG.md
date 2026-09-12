@@ -37,7 +37,7 @@ idempotente. Doce subcomandos; los que cambian el día a día:
 
 - **`init`** — materializa un cerebro: estructura, esquema portable, índices y derivados. El
   starter ya no versiona un `cerebro/` con TODOs: llega vacío y esto lo construye.
-- **`validate`** — 22 comprobaciones en dos niveles (OKF / perfil), porque OKF es
+- **`validate`** — 23 comprobaciones en dos niveles (OKF / perfil), porque OKF es
   deliberadamente permisivo y un validador estricto sobre él no sería conformante.
   **`--fix`** repara lo mecánico *preservando el significado, y verificándolo*: reparsea cada
   línea de frontmatter antes de escribirla, y nunca reescribe lo que redactó una persona.

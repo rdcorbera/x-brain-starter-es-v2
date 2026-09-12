@@ -6,6 +6,8 @@ description: <qué es y por qué importa, en una oración>
 tags: []
 classification: confidential          # mínimo de Insumo: confidential
 generated: {by: <by>, at: <at>}
+resumen: "<panorama en ~600 caracteres: qué dice este documento y qué decide quien lo lee>"
+procedencia: fuente          # fuente | dialogo | inferido | manual | derivado
 proyecto: transversal
 formato: pdf          # pdf | docx | pptx | xlsx | html | yaml
 origen: </raw/AAAA-MM-DD-descripcion-uuid.ext>
