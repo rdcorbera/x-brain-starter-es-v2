@@ -98,13 +98,13 @@ reabras decisiones ya cerradas sin consultar la bitácora.
 | `tmp/PLAN.md` | **El plan vigente.** Diagnóstico de las dos pendientes, los 10 pasos con su estado, riesgos y preguntas abiertas | Siempre, al retomar. Si algo lo contradice, manda este |
 | `tmp/BITACORA.md` | Las decisiones cerradas con su razón y lo que se descartó | Antes de reabrir cualquier decisión de diseño |
 | `tmp/inventario-reglas-v1.md` | Regla por regla de la prosa de v1, con su veredicto: sustituida, reducida o sobrevive | Al escribir o revisar prosa del kernel, y al construir los módulos |
-| `tmp/plan-implementacion-x-brain-v2.md` | Propuesta del equipo. **Insumo, no plan** | Al retomar la proyección, hechos atómicos o capa semántica (cortes 2–3). Ojo: propone DuckDB, y el motor se decidió SQLite |
+| `tmp/plan-implementacion-x-brain-v2.md` | Propuesta del equipo. **Insumo, no plan** | Al retomar la proyección, hechos atómicos o capa semántica (cortes 2–3). Ojo: propone DuckDB, **descartado como motor** — la proyección se hace sobre SQLite |
 | `tmp/plan-agent-zero-x-brain-v2.md` | **Plan de implementación vigente (rev. 8)**: las ideas del paper Agent Zero llevadas a tareas con criterio de aceptación, contrastadas contra el contrato real. **Gobierna la implementación**; sus siete decisiones están cerradas | Antes de tocar el contrato, el corte 2 o la migración del paso 9 |
 | `tmp/competency-questions-research.md` | La revisión de literatura de la que salen las 24 CQs | Antes de tocar `competency-questions.yml`, o al discutir si un tipo se sostiene |
 | `tmp/encargo-competency-questions.md` | El encargo con el que se pidieron las 24 CQs. **Formato de referencia** para cualquier encargo nuevo | Al escribir un encargo de investigación |
 | `tmp/encargo-memoria-largo-plazo.md` | **RETIRADO el 2026-09-11.** No se mandan más encargos al equipo de investigación externo. Se conserva como registro; lo que pedía y no estaba respondido —el olvido y la capa de hechos— vive ahora en las preguntas abiertas de `tmp/PLAN.md` | Solo como registro histórico |
 | `tmp/cerebro-survey.json` | La medición del cerebro real: 301 documentos, veredicto A/B, tipos, salud del frontmatter | Al dimensionar la migración (paso 9) |
-| `tmp/sqlite-results.json` | La sonda en la máquina de destino: SQLite 3.50.4, las 8 capacidades en verde | Al arrancar el corte 2 |
+| `tmp/sqlite-results.json` | La sonda en la máquina de destino: SQLite 3.50.4, las 8 capacidades en verde. **El veredicto vigente es `viable: true`**, medido fuera de OneDrive; el JSON guardado es el de la primera corrida —con el cerebro aún dentro de OneDrive— y por eso dice `viable: false`. Volcar el de la corrida buena | Al arrancar el corte 2 |
 | `tmp/rediseño second brain primera investigacion.md` | Búsqueda agéntica, grafos ligeros, OKF v0.2, progressive disclosure | Al evaluar recuperación a escala |
 | `tmp/rediseño second brain segunda investigacion.md` | Paradigmas alternativos y veredicto sobre Markdown-en-Git como fuente de verdad | Antes de reconsiderar la fuente de verdad |
 
@@ -130,11 +130,12 @@ Viven en `tmp/PLAN.md`, junto a los riesgos. Las que bloquean trabajo hoy:
 
 - La **taxonomía de clasificación** es una propuesta nuestra: validarla con gobierno de datos
   **antes** de clasificar el corpus, porque si la rechazan después hay que reclasificar todo.
-- **`Decision` tiene cero documentos en el cerebro real** (R8), y es el tipo que más competency
-  questions sostienen. **Y ahora tiene fecha de caducidad:** `/x-decision` existe desde el
-  2026-09-11 y `/x-procesar-inbox` lo propone al detectar una decisión en una fuente, así que en
-  cuanto el ritual se use sobre el cerebro real ya no se podrá distinguir «no se registraban» de
-  «no se registraban porque nadie lo pedía». Probar en un cerebro temporal no contamina nada;
-  usarlo sobre el de producción, sí. **Preguntar antes a quien lo opera.**
+- ~~**`Decision` tiene cero documentos en el cerebro real** (R8)~~ **Cerrado el 2026-09-12.** El
+  vacío se atribuye al **nivel de pruebas de v1**, escaso o nulo, no al diseño del tipo: v1 nunca
+  ejercitó una ingesta verificando qué tipos debía producir. Lo que sustituye a la encuesta a los
+  pilotos es la **batería de pruebas de v2**, que comprueba sobre un cerebro temporal que una
+  ingesta genera los tipos que corresponden, `Decision` incluido. **Deja de ser precondición del
+  corte 2.** Si tras esas pruebas el tipo siguiera sin aparecer sobre material real, se reabre —
+  con evidencia de v2, no heredada de v1.
 - ~~**El formato de `periodo` vive en prosa**~~ **Cerrado (2026-09-03)**: vive en
   `cerebro/schema.json` como `period_format`, con tres formas del kernel, y lo comprueba V21.

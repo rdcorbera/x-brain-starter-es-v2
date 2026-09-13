@@ -1,12 +1,23 @@
-# Entorno de las capas opcionales (conversor de insumos, proyección DuckDB).
-# La capa determinista de kernel/bin/ no necesita ninguno: es stdlib pura.
+# Entorno de las capas opcionales (conversor de insumos: `pdfminer.six`).
+# La capa determinista de kernel/bin/ no necesita ninguno: es stdlib pura,
+# y la proyección del corte 2 también — `sqlite3` viene con el intérprete.
 .venv/
 __pycache__/
 *.pyc
 
-# Proyección DuckDB (corte 2): derivada y reconstruible, nunca se versiona.
+# Proyección SQLite (corte 2): derivada y reconstruible, nunca se versiona.
+# DuckDB quedó descartado como motor; no se contempla usarlo.
+#
+# Los sidecars `-wal` y `-shm` los crea SQLite en modo WAL —el que la sonda
+# comprueba— y aparecen junto a la base mientras hay una conexión abierta.
+# Se ignoran por su nombre, no por su carpeta: un `.db` puede acabar junto al
+# bundle, que es donde la decisión de R9 lo permite.
 _db/
-*.duckdb
+*.sqlite
+*.sqlite3
+*.db
+*-wal
+*-shm
 
 # Ruido del sistema
 .DS_Store

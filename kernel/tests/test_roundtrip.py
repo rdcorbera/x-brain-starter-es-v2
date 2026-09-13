@@ -513,6 +513,16 @@ def check_layering() -> List[str]:
                     f"{name}.py importa de `{target}`: rompe el sentido único "
                     f"({' -> '.join(order)})")
 
+    # Todo módulo de brainlib declara su sitio. Sin esto, el bucle de arriba solo
+    # mira los que ya están en `order`: uno nuevo entra sin que nadie revise sus
+    # imports -- ni siquiera un ciclo entre dos módulos nuevos -- y el test sigue
+    # diciendo «las capas sin ciclos», que es afirmar un control que no se hizo.
+    # Mismo patrón que `completeness_rule` del contrato: obliga a una respuesta
+    # consciente al añadir, en vez de confiar en que alguien recuerde la lista.
+    for name in sorted({p.stem for p in lib.glob("*.py")} - set(order) - {"__init__"}):
+        problems.append(f"{name}.py no declara su sitio en la cadena: añádelo a "
+                        f"`order` ({' -> '.join(order)}), o no es un trabajo")
+
     # 2.500 fue lo que disparó R6. Se mide por archivo, que es lo que el corte
     # arregla; el total puede crecer y no es el problema.
     for path in sorted(lib.glob("*.py")) + [ROOT / "kernel" / "bin" / "brain.py"]:
