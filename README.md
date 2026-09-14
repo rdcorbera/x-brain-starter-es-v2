@@ -58,6 +58,7 @@ kernel/schema/contract.json      ← EL CONTRATO. Fuente única.
         ├─ brain index ───→ cerebro/**/index.md
         ├─ brain derive ──→ PREGUNTAS-ABIERTAS.md, GOALS.md, ORGANIGRAMA.md
         └─ brain project ─→ --ddl: el mismo esquema, ya con los tipos propios de este cerebro
+                          ─→ la base consultable, poblada desde el markdown
 ```
 
 **El esquema SQL no se escribe a mano.** Una tabla por tipo, `documentos` con los campos

@@ -63,7 +63,7 @@ No negociables. Si un cambio los rompe, el cambio está mal.
    cada línea antes de escribirla. Nunca reescribe lo que una persona redactó.
 5. **Un artefacto generado no se edita.** Se edita `kernel/schema/contract.json` y se regenera.
    **V14 lo comprueba.**
-6. **El corte es por trabajos, y va en un solo sentido.** `const → parse → generate → validate
+6. **El corte es por trabajos, y va en un solo sentido.** `const → parse → generate → validate → project` *(project entró con T5)*. El orden histórico era `const → parse → generate → validate
    → report`, y `brain.py` encima como CLI. Un módulo solo importa de los que tiene a su
    izquierda. Partir el archivo no sirve de nada si los módulos acaban importándose en círculo:
    sería el mismo archivo repartido en cinco. **`check_layering` lo comprueba**, incluidos los

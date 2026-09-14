@@ -252,10 +252,22 @@ def _json_schema_field(field: Dict[str, Any], contract: Contract) -> dict:
 # así que el DDL se verifica en CI aunque la máquina no pueda alojar una base.
 
 
+def _sql_name(name: str) -> str:
+    """El nombre de una columna o tabla. NO es el nombre del campo.
+
+    `fecha-creacion` es un campo válido y `fecha-creacion` no es un
+    identificador que se pueda escribir sin comillas en ninguna consulta, así
+    que la columna se llama `fecha_creacion`. Mantener los dos nombres
+    separados importa: el proyector inserta por nombre de COLUMNA y lee por
+    nombre de CAMPO, y confundirlos costó un `no such column` en T5.
+    """
+    return name.lower().replace("-", "_")
+
+
 def _sql_ident(name: str) -> str:
     """Identificador SQL. Entrecomillar siempre sale gratis y elimina de golpe
     la clase entera de choques con palabras reservadas."""
-    return '"' + name.lower().replace("-", "_") + '"'
+    return '"' + _sql_name(name) + '"'
 
 
 def _sql_of(contract: Contract, field: Dict[str, Any]) -> Dict[str, Any]:
@@ -331,9 +343,9 @@ def _sql_create(name: str, columns: List[str]) -> str:
 
 def _sql_fields(contract: Contract, fields: Dict[str, Any], prefix: str = "",
                 unique_field: Optional[str] = None
-                ) -> Tuple[List[str], List[Tuple[str, Dict[str, Any]]]]:
+                ) -> Tuple[List[Dict[str, Any]], List[Tuple[str, Dict[str, Any]]]]:
     """Reparte los campos en columnas y en tablas hijas, según su estrategia."""
-    columns: List[str] = []
+    columns: List[Dict[str, Any]] = []
     children: List[Tuple[str, Dict[str, Any]]] = []
     for name, field in fields.items():
         if not isinstance(field, dict) or field.get("deprecated_by"):
@@ -350,42 +362,61 @@ def _sql_fields(contract: Contract, fields: Dict[str, Any], prefix: str = "",
                        or field.get("severity") in (WARNING, "info"))
             for member, spec in _sql_members(contract, field).items():
                 spec = dict(spec) if not relaxed else {**spec, "required": False}
-                columns.append(_sql_column(contract, member, spec,
-                                           prefix=f"{name}_"))
+                columns.append({"column": _sql_name(f"{name}_{member}"),
+                                "field": name, "member": member,
+                                "sql": _sql_column(contract, member, spec,
+                                                   prefix=f"{name}_")})
         else:
-            columns.append(_sql_column(contract, name, field, prefix=prefix,
-                                       unique=(name == unique_field)))
+            columns.append({"column": _sql_name(name), "field": name, "member": None,
+                            "sql": _sql_column(contract, name, field, prefix=prefix,
+                                               unique=(name == unique_field))})
     return columns, children
 
 
-def render_ddl(contract: Contract) -> str:
-    """El esquema SQL entero, derivado del contrato: ni una tabla escrita a mano.
+def projection_plan(contract: Contract) -> List[Dict[str, Any]]:
+    """Qué tablas hay y qué campo alimenta cada columna. **Una sola vez.**
 
-    Agregar un campo -- o un `data_type` nuevo -- cambia este archivo sin tocar
-    una línea de código. Es el criterio de aceptación de T4, y la razón de que
-    el mapa a tipos SQL viva en el contrato y no aquí.
+    El DDL lo renderiza y el proyector lo puebla, y por eso existe: si cada uno
+    dedujera el reparto por su cuenta, divergirían -- y el síntoma sería una
+    columna que el esquema declara y nadie rellena, o al revés. Es el mismo
+    argumento por el que el mapa a SQL vive en el contrato y no en el código,
+    aplicado una capa más arriba.
     """
     proj = contract.projection
     if not proj:
         raise SystemExit("error: el contrato no declara el bloque `projection`")
     docs = proj.get("documents_table", "documentos")
-    out = [GENERATED_MARK_SQL, "",
-           "-- Las claves foráneas no están activas por defecto en SQLite: hay",
-           "-- que pedirlo en cada conexión, o las referencias son decorativas.",
-           "PRAGMA foreign_keys = ON;", ""]
+    cfg = proj.get("child_tables", {})
+    parent_col = cfg.get("parent_column", "doc")
+    order_col = cfg.get("order_column", "idx")
+    value_col = cfg.get("value_column", "value")
+    plan: List[Dict[str, Any]] = []
 
-    columns = []
-    for name, spec in proj.get("synthetic_columns", {}).items():
-        if not isinstance(spec, dict):
-            continue                      # `note`: prosa para quien lea el contrato
-        col = f"{_sql_ident(name)} {spec.get('sql', {}).get('type', 'TEXT')} NOT NULL"
-        columns.append(col + (" PRIMARY KEY" if spec.get("role") == "primary_key" else ""))
+    def child(parent: str, parent_pk: str, field_name: str,
+              field: Dict[str, Any]) -> Dict[str, Any]:
+        name = cfg.get("name_pattern", "{parent}_{field}").format(
+            parent=parent, field=field_name)
+        of = field.get("of", "text")
+        members = (list(_sql_members(contract, field).items()) if of == "map"
+                   else [(value_col, {"data_type": of, "required": True})])
+        columns = [{"column": _sql_name(m),
+                    "member": (m if of == "map" else None), "field": field_name,
+                    "sql": _sql_column(contract, m, spec)} for m, spec in members]
+        return {"table": name, "role": "child", "parent": parent,
+                "parent_column": parent_col, "parent_key": parent_pk,
+                "order_column": order_col, "field": field_name, "of": of,
+                "columns": columns}
+
+    synthetic = [{"column": name, "source": name, "sql":
+                  f"{_sql_ident(name)} {spec.get('sql', {}).get('type', 'TEXT')} NOT NULL"
+                  + (" PRIMARY KEY" if spec.get("role") == "primary_key" else "")}
+                 for name, spec in proj.get("synthetic_columns", {}).items()
+                 if isinstance(spec, dict)]
     common_cols, common_children = _sql_fields(contract, contract.common)
-    out.append(_sql_create(docs, columns + common_cols))
-    out.append("")
+    plan.append({"table": docs, "role": "documents", "key": _primary_key(contract, docs),
+                 "columns": synthetic + common_cols})
     for field_name, field in common_children:
-        out.append(_sql_child_table(contract, docs, field_name, field))
-        out.append("")
+        plan.append(child(docs, _primary_key(contract, docs), field_name, field))
 
     for type_name in sorted(contract.types):
         spec = contract.types[type_name]
@@ -398,17 +429,45 @@ def render_ddl(contract: Contract) -> str:
         type_cols, type_children = _sql_fields(
             contract, own,
             unique_field=spec.get("key") if spec.get("key_unique") else None)
-        pk = _sql_ident(_primary_key(contract, table))
-        out.append(_sql_create(table, [
-            f"{pk} TEXT NOT NULL PRIMARY KEY REFERENCES {_sql_ident(docs)}"
-            f"({_sql_ident(_primary_key(contract, docs))}) ON DELETE CASCADE"
-        ] + type_cols))
-        out.append("")
+        link = (f"{_sql_ident(parent_col)} TEXT NOT NULL PRIMARY KEY "
+                f"REFERENCES {_sql_ident(docs)}"
+                f"({_sql_ident(_primary_key(contract, docs))}) ON DELETE CASCADE")
+        plan.append({"table": table, "role": "type", "type_name": type_name,
+                     "key": parent_col,
+                     "columns": [{"column": _sql_name(parent_col), "source": "path",
+                              "sql": link}]
+                                + type_cols})
         for field_name, field in type_children:
-            out.append(_sql_child_table(contract, table, field_name, field))
-            out.append("")
+            plan.append(child(table, parent_col, field_name, field))
+    return plan
 
+
+def render_ddl(contract: Contract) -> str:
+    """El esquema SQL entero, derivado del contrato: ni una tabla escrita a mano.
+
+    Agregar un campo -- o un `data_type` nuevo -- cambia este archivo sin tocar
+    una línea de código. Es el criterio de aceptación de T4, y la razón de que
+    el mapa a tipos SQL viva en el contrato y no aquí.
+    """
+    out = [GENERATED_MARK_SQL, "",
+           "-- Las claves foráneas no están activas por defecto en SQLite: hay",
+           "-- que pedirlo en cada conexión, o las referencias son decorativas.",
+           "PRAGMA foreign_keys = ON;", ""]
+    for table in projection_plan(contract):
+        columns = [c["sql"] for c in table["columns"]]
+        if table["role"] == "child":
+            columns = [
+                f'{_sql_ident(table["parent_column"])} TEXT NOT NULL '
+                f'REFERENCES {_sql_ident(table["parent"])}'
+                f'({_sql_ident(table["parent_key"])}) ON DELETE CASCADE',
+                f'{_sql_ident(table["order_column"])} INTEGER NOT NULL',
+            ] + columns + [
+                f'PRIMARY KEY ({_sql_ident(table["parent_column"])}, '
+                f'{_sql_ident(table["order_column"])})']
+        out.append(_sql_create(table["table"], columns))
+        out.append("")
     return "\n".join(out).rstrip() + "\n"
+
 
 def build_indexes(contract: Contract, docs: List[Document],
                   bundle: Path) -> Dict[Path, str]:

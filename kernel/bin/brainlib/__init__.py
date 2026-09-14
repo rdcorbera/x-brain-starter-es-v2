@@ -10,10 +10,11 @@ El corte es **por trabajo, nunca arbitrario** — esa era la condición:
     generate.py   ESCRIBIR  plantillas, esquemas, índices, derivados, stubs, DDL
     validate.py   COMPROBAR los 25 checks, en dos niveles
     report.py     RENDIR    lo que los otros tres encontraron
+    project.py    PROYECTAR los documentos a una base consultable
 
 Las dependencias van en un solo sentido y no hay ciclos:
 
-    const → parse → generate → validate → report → brain.py (la CLI)
+    const → parse → generate → validate → report → project → brain.py (la CLI)
 
 `brain.py` se queda con la interfaz: argparse, los `cmd_*` y el hook de git. Es
 el punto de entrada que la documentación, el lanzador y el pre-commit nombran,
@@ -43,5 +44,6 @@ from .validate import (CHECKS, Finding, Validator, apply_fixes, check_value,
                        fix_yaml_hazards, is_uninitialised, parse_instant,
                        require_bundle)
 from .report import governance_report, print_profile_proposals, report
+from .project import database_path, project, snapshot
 
 __all__ = [n for n in dir() if not n.startswith("_")]

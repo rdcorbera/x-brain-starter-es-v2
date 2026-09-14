@@ -177,6 +177,25 @@ fallar. Desaparecen el `.venv`, el `requirements.txt` y el re-exec.
 - Requerido pero relajado a aviso mientras el corpus migra: los 301 documentos de producción son
   anteriores al campo.
 
+### La proyección: el cerebro, consultable con SQL
+
+- **`./brain project`** puebla una base SQLite desde el markdown. Compara el SHA-256 de cada
+  archivo con el de su fila, así que una segunda corrida no reescribe nada; **`--full`**
+  reconstruye la base entera.
+- **`--full` y una pasada incremental producen exactamente lo mismo**, y el round-trip lo
+  comprueba por los cuatro caminos: crear, no tocar nada, modificar y borrar. Esa propiedad es lo
+  que permite tratar la base como desechable — y por tanto seguir tratando el markdown como la
+  única fuente. Si difirieran, habría estado en la base que no está en los documentos y nadie
+  sabría cuál creer.
+- **Se proyecta conocimiento y solo conocimiento.** Fuera quedan los archivos reservados
+  (`log.md`), los derivados y los índices: los escribe el generador desde este mismo contenido, y
+  guardarlos sería tener dos copias para que una envejezca.
+- **El reparto de campo a columna se decide una vez** (`projection_plan`): el DDL lo renderiza y
+  el proyector lo puebla. Deducirlo dos veces es cómo un esquema acaba declarando columnas que
+  nadie rellena.
+- La base no se versiona: `.gitignore` cubre `_db/`, `*.db`, `*.sqlite` y los sidecars `-wal` y
+  `-shm` del modo WAL.
+
 ### Migración desde un cerebro v1
 
 Los cerebros de v1 **no son conformes al perfil de v2** hasta migrarlos, pero siguen siendo

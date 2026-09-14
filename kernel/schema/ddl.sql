@@ -7,7 +7,6 @@ PRAGMA foreign_keys = ON;
 CREATE TABLE "documentos" (
   "path" TEXT NOT NULL PRIMARY KEY,
   "hash" TEXT NOT NULL,
-  "projected_at" TEXT NOT NULL,
   "type" TEXT NOT NULL,
   "title" TEXT NOT NULL,
   "description" TEXT NOT NULL,

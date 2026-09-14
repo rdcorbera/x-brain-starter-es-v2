@@ -73,6 +73,7 @@ completo para deducir lo mismo, unos 10.000.
 | Calcular el SHA-256 de un original, para su fila del manifiesto | `./brain hash <archivo>` |
 | Ver el esquema SQL de la proyección de este cerebro | `./brain project --ddl` |
 | Sellar un `resumen` recién escrito contra su cuerpo | `./brain hash <archivo> --body --write` |
+| Proyectar el cerebro a una base consultable | `./brain project` (o `--full` para reconstruirla) |
 
 **Un artefacto generado no se edita: se regenera.** Si algo generado está mal, lo que está mal
 es `kernel/schema/contract.json`. Editar la salida es trabajo que se pierde en la siguiente
@@ -299,9 +300,10 @@ x-brain/
 │   │   ├── brainlib/             ← la capa determinista, cortada por sus trabajos
 │   │   │   ├── const.py          ←   el vocabulario compartido
 │   │   │   ├── parse.py          ←   LEER: OKF-YAML, documentos, contrato, moldes
-│   │   │   ├── generate.py       ←   ESCRIBIR: plantillas, índices, derivados, stubs
+│   │   │   ├── generate.py       ←   ESCRIBIR: plantillas, índices, derivados, stubs, DDL
 │   │   │   ├── validate.py       ←   COMPROBAR: los 25 checks, en dos niveles
-│   │   │   └── report.py         ←   RENDIR: lo que los otros tres encontraron
+│   │   │   ├── report.py         ←   RENDIR: lo que los otros tres encontraron
+│   │   │   └── project.py        ←   PROYECTAR: el cerebro a una base SQLite
 │   │   ├── to-markdown.py         ← insumos binarios → markdown (cero tokens)
 │   │   ├── survey.py             ← preflight: dónde se van los tokens
 │   │   └── sqlite-probe.py       ← preflight: ¿sirve esta ruta para la proyección?

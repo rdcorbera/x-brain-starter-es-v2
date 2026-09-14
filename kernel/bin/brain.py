@@ -477,9 +477,20 @@ def cmd_project(args) -> int:
     if args.ddl:
         print(render_ddl(contract), end="")
         return 0
-    print("error: por ahora `project` solo sabe `--ddl`; aplicar y poblar la "
-          "base llega con T5", file=sys.stderr)
-    return 2
+
+    bundle = Path(args.path)
+    require_bundle(bundle)
+    destino = Path(args.db) if args.db else database_path(contract)
+    stats = project(contract, bundle, destino, full=args.full)
+    modo = "completa" if args.full else "incremental"
+    print(f"brain project {bundle}: proyección {modo} en {destino} -- "
+          + ", ".join(f"{v} {k}" for k, v in stats.items()) + ".")
+    # La base es derivada y se puede borrar sin perder nada: decirlo aquí evita
+    # que alguien la trate como una fuente y la versione «por si acaso».
+    if args.full or stats["escritos"]:
+        print("       Derivada del markdown, que sigue siendo la fuente. "
+              "`--full` la reconstruye entera.")
+    return 0
 
 
 def main() -> int:
@@ -549,9 +560,13 @@ def main() -> int:
     p = sub.add_parser("generate", help="regenerar todos los artefactos")
     p.set_defaults(func=cmd_generate)
 
-    p = sub.add_parser("project", help="la proyección SQLite (hoy: su esquema)")
+    p = sub.add_parser("project", help="proyectar el cerebro a una base SQLite consultable")
+    p.add_argument("path", nargs="?", default=str(DEFAULT_BUNDLE))
     p.add_argument("--ddl", action="store_true",
                    help="imprimir el DDL que sale del contrato, sin tocar disco")
+    p.add_argument("--db", help="dónde vive la base (por defecto, la del contrato)")
+    p.add_argument("--full", action="store_true",
+                   help="reconstruir la base entera en vez de proyectar lo que cambió")
     p.set_defaults(func=cmd_project)
 
     args = parser.parse_args()

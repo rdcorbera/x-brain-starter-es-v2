@@ -573,6 +573,77 @@ def check_ddl(contract) -> List[str]:
     return problems
 
 
+def check_projection(contract) -> List[str]:
+    """El criterio de T5: `--full` y una pasada incremental dicen lo mismo.
+
+    Es la propiedad que hace que la proyección sea desechable, y por tanto la
+    que permite tratar el markdown como la única fuente: si reconstruir desde
+    cero diera un resultado distinto de ir actualizando, habría estado en la
+    base que no está en los documentos, y nadie sabría cuál de las dos creer.
+
+    Se comprueba sobre un cerebro de verdad, escrito aquí mismo, y por los
+    cuatro caminos que tiene una proyección: crear, no hacer nada, modificar y
+    borrar.
+    """
+    try:
+        import sqlite3                                            # noqa: F401
+    except ImportError:
+        print("  (sqlite3 no disponible: la proyección no se ejercitó)")
+        return []
+
+    problems = []
+    tmp = Path(tempfile.mkdtemp(prefix="brain-project-"))
+    try:
+        bundle = tmp / "cerebro"
+        with redirect_stdout(io.StringIO()):
+            brain.cmd_init(SimpleNamespace(
+                path=str(bundle), contract=str(ROOT / "kernel/schema/contract.json"),
+                bundle=str(bundle), profile=None))
+        local = brain.Contract.load(ROOT / "kernel/schema/contract.json", bundle)
+
+        # Un documento por tipo, rellenado desde su propia plantilla: así el
+        # proyector se ejercita contra TODOS los tipos, no contra los dos que
+        # a alguien se le ocurrieran.
+        for type_name in local.types:
+            if local.types[type_name].get("generated_only"):
+                continue
+            body = fill(brain.render_template(local, type_name), local, type_name)
+            (bundle / f"caso-{type_name.lower()}.md").write_text(body, encoding="utf-8")
+
+        db = tmp / "prueba.db"
+        brain.project(local, bundle, db, full=True)
+        estado_full = brain.snapshot(db)
+        if estado_full.count("\n") < len(local.types):
+            problems.append("la proyección completa dejó la base casi vacía")
+
+        brain.project(local, bundle, db)
+        if brain.snapshot(db) != estado_full:
+            problems.append("una pasada incremental sin cambios alteró la base")
+
+        objetivo = bundle / "caso-reunion.md"
+        objetivo.write_text(objetivo.read_text(encoding="utf-8")
+                            .replace("title: ", "title: Reescrito "), encoding="utf-8")
+        brain.project(local, bundle, db)
+        tras_incremental = brain.snapshot(db)
+        if tras_incremental == estado_full:
+            problems.append("un documento modificado no llegó a la base")
+        brain.project(local, bundle, db, full=True)
+        if brain.snapshot(db) != tras_incremental:
+            problems.append("tras modificar, `--full` y la incremental difieren")
+
+        objetivo.unlink()
+        brain.project(local, bundle, db)
+        tras_borrado = brain.snapshot(db)
+        if "caso-reunion.md |" in tras_borrado:
+            problems.append("un documento borrado dejó filas en la base")
+        brain.project(local, bundle, db, full=True)
+        if brain.snapshot(db) != tras_borrado:
+            problems.append("tras borrar, `--full` y la incremental difieren")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return problems
+
+
 def check_layering() -> List[str]:
     """El corte por trabajos sigue siendo un corte.
 
@@ -582,10 +653,16 @@ def check_layering() -> List[str]:
     dependencias van en UN sentido — y de paso que ningún módulo vuelve a
     acercarse al umbral que obligó a cortar.
 
-    El orden declarado es const -> parse -> generate -> validate -> report.
-    Un módulo solo puede importar de los que tiene a su izquierda.
+    El orden declarado es const -> parse -> generate -> validate -> report
+    -> project. Un módulo solo puede importar de los que tiene a su izquierda.
+
+    `project` entró al final el 2026-09-13 con T5: es un consumidor —lee
+    documentos, usa el contrato y da por hecha la validación—, y nadie tiene
+    por qué importar de él. La posición se eligió por compatibilidad con esta
+    regla, no por convicción de que la regla siga siendo la mejor: eso queda
+    abierto en el plan, con su disparador.
     """
-    order = ["const", "parse", "generate", "validate", "report"]
+    order = ["const", "parse", "generate", "validate", "report", "project"]
     lib = ROOT / "kernel" / "bin" / "brainlib"
     problems = []
 
@@ -631,7 +708,8 @@ def main() -> int:
     failures = (check_provenance(contract) + check_yaml_compatibility(contract)
                 + check_locations(contract) + check_derived_specs(contract)
                 + check_period_formats(contract) + check_role_profiles(contract)
-                + check_layering() + check_ddl(contract) + check_init(contract)
+                + check_layering() + check_ddl(contract)
+                + check_projection(contract) + check_init(contract)
                 + check_competency_questions(contract))
 
     try:
@@ -669,7 +747,8 @@ def main() -> int:
 
     profiles = brain.find_profiles(ROOT / "kernel")
     print(f"OK -- provenance completo, derivados consistentes, el DDL lo acepta "
-          f"SQLite y deriva del contrato, formas de periodo "
+          f"SQLite y deriva del contrato, la proyección incremental dice lo mismo "
+          f"que `--full`, formas de periodo "
           f"disjuntas, los {len(profiles)} profiles de rol completos, las capas "
           f"sin ciclos, `init` idempotente y validando, las competency questions "
           f"cuadran con el contrato, y las plantillas de los {len(tested)} tipos, "
