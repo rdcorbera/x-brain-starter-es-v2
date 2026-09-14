@@ -608,6 +608,11 @@ def check_projection(contract) -> List[str]:
             if local.types[type_name].get("generated_only"):
                 continue
             body = fill(brain.render_template(local, type_name), local, type_name)
+            # Una fecha distinta por tipo: con todas iguales, la comprobación
+            # del orden de la vista de eventos no distinguiría nada.
+            dia = f"2026-{(len(body) % 12) + 1:02d}-{(len(type_name) % 28) + 1:02d}"
+            body = re.sub(r"(?m)^((?:fecha|fecha-creacion|ultima-revision): )\d{4}-\d{2}-\d{2}$",
+                          lambda m: m.group(1) + dia, body)
             (bundle / f"caso-{type_name.lower()}.md").write_text(body, encoding="utf-8")
 
         db = tmp / "prueba.db"
@@ -619,6 +624,11 @@ def check_projection(contract) -> List[str]:
         brain.project(local, bundle, db)
         if brain.snapshot(db) != estado_full:
             problems.append("una pasada incremental sin cambios alteró la base")
+
+        # T6: la vista de eventos, y CQ-47 respondida con ella. Se ejecuta el
+        # `sql:` que declara la propia pregunta -- si la consulta de una CQ no
+        # corre contra el esquema, la CQ no está respondida, está redactada.
+        problems += _check_timeline(local, db)
 
         objetivo = bundle / "caso-reunion.md"
         objetivo.write_text(objetivo.read_text(encoding="utf-8")
@@ -641,6 +651,78 @@ def check_projection(contract) -> List[str]:
             problems.append("tras borrar, `--full` y la incremental difieren")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+    return problems
+
+
+def _check_timeline(contract, db_path) -> List[str]:
+    """La vista de eventos: los cinco tipos, en orden, y sin los que no lo son."""
+    import sqlite3
+    problems = []
+    cfg = contract.projection.get("timeline", {})
+    view = cfg.get("view")
+    if not view:
+        return ["el contrato no declara la vista de eventos"]
+
+    db = sqlite3.connect(db_path)
+    try:
+        filas = list(db.execute(f'select "fecha", "tipo", "campo" from "{view}"'))
+    except sqlite3.Error as exc:
+        db.close()
+        return [f"la vista `{view}` no se puede consultar: {exc}"]
+
+    # La referencia se lee del CONTRATO, no de `timeline_fields`. Usar la
+    # función que se está probando como patrón de lo que debería salir es
+    # comparar el generador consigo mismo: al rompernos la regla a propósito
+    # —seleccionar por el nombre `fecha`, el defecto original— la vista se
+    # quedó en tres tipos y este test decía OK. Un control cuya referencia
+    # depende de lo controlado no controla nada.
+    esperados = {name for name, spec in contract.types.items()
+                 if not spec.get("generated_only")
+                 and any(isinstance(f, dict) and f.get("data_type") == "date"
+                         and f.get("timeline") is not False
+                         for f in (spec.get("fields") or {}).values())}
+    presentes = {f[1] for f in filas}
+    if esperados - presentes:
+        problems.append("tipos fechados que no aparecen en la vista de eventos: "
+                        + ", ".join(sorted(esperados - presentes)))
+    for excluido in cfg.get("opted_out", []):
+        tipo = excluido.split(".")[0]
+        if tipo in presentes and tipo not in esperados:
+            problems.append(f"`{excluido}` declara `timeline: false` y aun así "
+                            f"aparece en la vista")
+
+    fechas = [f[0] for f in filas if f[0]]
+    orden = sorted(fechas, reverse=str(cfg.get("order", "desc")).lower() == "desc")
+    if fechas != orden:
+        problems.append("la vista de eventos no sale en orden cronológico")
+    if len(set(fechas)) < 2:
+        # Con todas las fechas iguales, cualquier orden «pasa»: la
+        # comprobación de arriba no habría distinguido una vista ordenada de
+        # una que no lo está. Quien prepara los datos tiene que variarlas.
+        problems.append("la prueba del orden es vacua: las fechas de los "
+                        "documentos de prueba no son distintas entre sí")
+    definicion = db.execute("select sql from sqlite_master where name = ?",
+                            (view,)).fetchone()
+    if definicion and "order by" not in (definicion[0] or "").lower():
+        problems.append("la vista no declara `order by`: el orden cronológico "
+                        "quedaría a merced del plan de ejecución")
+
+    # Y la pregunta que justifica la vista, ejecutada tal y como la declara.
+    yml = (ROOT / "kernel" / "tests" / "competency-questions.yml").read_text(encoding="utf-8")
+    bloque = next((b for b in re.split(r"\n  - id: ", yml) if b.startswith("CQ-47")), "")
+    # Solo las líneas MÁS indentadas que la clave: `\s+` se comería el blanco
+    # y el comentario que siguen, y el SQL acabaría con un `#` dentro.
+    consulta = re.search(r"^(\s*)sql: >-\n((?:\1[ ]+\S.*\n)+)", bloque, re.M)
+    if not consulta:
+        problems.append("CQ-47 no declara su `sql:`, que es el criterio de T6")
+    else:
+        texto = " ".join(l.strip() for l in consulta.group(2).splitlines())
+        try:
+            db.execute(texto, {"proyecto": "x", "desde": "2000-01-01",
+                               "hasta": "2100-01-01"}).fetchall()
+        except sqlite3.Error as exc:
+            problems.append(f"el `sql:` de CQ-47 no corre contra el esquema: {exc}")
+    db.close()
     return problems
 
 

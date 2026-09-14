@@ -196,6 +196,21 @@ fallar. Desaparecen el `.venv`, el `requirements.txt` y el re-exec.
 - La base no se versiona: `.gitignore` cubre `_db/`, `*.db`, `*.sqlite` y los sidecars `-wal` y
   `-shm` del modo WAL.
 
+### La vista de eventos: qué pasó, en una consulta
+
+- **`eventos`** junta en una sola lista ordenada todo lo que tiene fecha —reuniones, decisiones,
+  preguntas abiertas, análisis y revisiones de plan—, con su tipo, su fecha, su título y el
+  enlace a su documento. Reconstruir lo que pasó en una iniciativa deja de exigir abrir su
+  carpeta entera.
+- **Se genera por regla, nunca por una lista de nombres**: entra todo campo con
+  `data_type: date`. Seleccionar por el nombre `fecha` habría omitido `Pregunta.fecha-creacion` y
+  `Plan.ultima-revision` **en silencio**, que es el defecto que esta regla vino a eliminar. Un
+  tipo nuevo con fecha entra solo.
+- **Un campo que es fecha pero no es un evento se excluye declarándolo**, no con una excepción en
+  el código: `Diagrama.version` lleva `timeline: false` y la razón escrita en su propio campo.
+- Una fila por campo fechado, no por documento: un tipo con dos fechas aporta dos eventos, y por
+  eso la vista lleva `campo`.
+
 ### Migración desde un cerebro v1
 
 Los cerebros de v1 **no son conformes al perfil de v2** hasta migrarlos, pero siguen siendo

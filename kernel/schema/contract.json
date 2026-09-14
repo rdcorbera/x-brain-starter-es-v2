@@ -654,7 +654,11 @@
     "timeline": {
       "note": "The event view of T6 is built from EVERY field with `data_type: date`, by rule and never by listing names -- listing them by hand is how the first version silently dropped `Pregunta.fecha-creacion` and `Plan.ultima-revision`. A field that is a date but not an event opts out with `timeline: false` and says why in its own `note`. Decided 2026-09-13, when counting against the generated DDL showed six date fields where the plan claimed five.",
       "rule": "every field with data_type `date`, unless it declares `timeline: false`",
-      "opted_out": ["Diagrama.version"]
+      "opted_out": ["Diagrama.version"],
+      "view": "eventos",
+      "order": "desc",
+      "scope_field": "proyecto",
+      "view_note": "One row per dated field, not per document: a type with two date fields produces two events, which is why the view carries `campo`. Its shape -- fecha, tipo, campo, doc, title, and the scope field -- is structure rather than configuration, so it lives in the generator; what is declared here is what can change without changing code: the name, the direction, and which field scopes a query to one initiative. `order: desc` matches `log.md`, where the most recent is on top: someone reconstructing what happened reads backwards from now."
     },
     "child_tables": {
       "note": "D3, option A: structured fields are normalised -- never a comma-joined string, never a JSON blob. `json1` is compiled in, but STRICT is what makes the engine reject the wrong type, and `sources`/`verified` are precisely the governance fields the competency questions ask about. Three rules and no per-name exceptions, so a new structured field grows its table without code.",

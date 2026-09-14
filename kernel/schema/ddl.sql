@@ -163,3 +163,32 @@ CREATE TABLE "sistema" (
   "categoria" TEXT NOT NULL CHECK ("categoria" IN ('sistema', 'herramienta', 'producto', 'proceso')),
   "estado" TEXT NOT NULL CHECK ("estado" IN ('activo', 'en-cambio', 'deprecado'))
 ) STRICT;
+
+-- Un evento por campo fechado, no por documento: un tipo con dos
+-- fechas aporta dos filas, y por eso la vista lleva `campo`.
+CREATE VIEW "eventos" AS
+  select t."fecha" as "fecha", 'Analisis' as "tipo", 'fecha' as "campo",
+         d."path" as "doc", d."title" as "title",
+         t."proyecto" as "proyecto"
+    from "analisis" t join "documentos" d on d."path" = t."doc"
+  union all
+  select t."fecha" as "fecha", 'Decision' as "tipo", 'fecha' as "campo",
+         d."path" as "doc", d."title" as "title",
+         t."proyecto" as "proyecto"
+    from "decision" t join "documentos" d on d."path" = t."doc"
+  union all
+  select t."ultima_revision" as "fecha", 'Plan' as "tipo", 'ultima-revision' as "campo",
+         d."path" as "doc", d."title" as "title",
+         t."proyecto" as "proyecto"
+    from "plan" t join "documentos" d on d."path" = t."doc"
+  union all
+  select t."fecha_creacion" as "fecha", 'Pregunta' as "tipo", 'fecha-creacion' as "campo",
+         d."path" as "doc", d."title" as "title",
+         t."proyecto" as "proyecto"
+    from "pregunta" t join "documentos" d on d."path" = t."doc"
+  union all
+  select t."fecha" as "fecha", 'Reunion' as "tipo", 'fecha' as "campo",
+         d."path" as "doc", d."title" as "title",
+         t."proyecto" as "proyecto"
+    from "reunion" t join "documentos" d on d."path" = t."doc"
+  order by "fecha" desc;

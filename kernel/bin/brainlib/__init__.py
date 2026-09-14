@@ -38,6 +38,7 @@ from .generate import (build_derived, build_indexes, build_stubs,
                        derived_is_current, json_schema_for,
                        location_patterns_for_match, period_segments,
                        render_bundle_schema, render_ddl, render_template,
+                       render_timeline_view, timeline_fields,
                        PRE_COMMIT_MARKER, resolve_locations,
                        write_bundle_schema, write_if_changed, write_text_lf)
 from .validate import (CHECKS, Finding, Validator, apply_fixes, check_value,

@@ -517,6 +517,9 @@ questions:
       NOMBRE `fecha` -- omitiría dos de los cinco tipos en silencio. Se genera
       sobre todo campo con `data_type: date`, y así un tipo nuevo con fecha
       entra solo de verdad. `proyecto` sí está en los cinco.
+    sql: >-
+      select fecha, tipo, campo, title, doc from eventos
+      where proyecto = :proyecto and fecha between :desde and :hasta
 
   # -- vigencia: qué valía cuándo ----------------------------------------------
 

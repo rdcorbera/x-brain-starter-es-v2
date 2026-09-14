@@ -466,7 +466,64 @@ def render_ddl(contract: Contract) -> str:
                 f'{_sql_ident(table["order_column"])})']
         out.append(_sql_create(table["table"], columns))
         out.append("")
+    vista = render_timeline_view(contract)
+    if vista:
+        out.append(vista)
+        out.append("")
     return "\n".join(out).rstrip() + "\n"
+
+
+def timeline_fields(contract: Contract) -> List[Tuple[str, str]]:
+    """(tipo, campo) de todo lo que es un evento, por REGLA y nunca por nombre.
+
+    Listar los nombres a mano fue el defecto original: `Pregunta` llama a su
+    fecha `fecha-creacion` y `Plan` `ultima-revision`, así que seleccionar por
+    el nombre `fecha` omitía dos de los cinco tipos **en silencio**. La regla
+    mecánica los recoge solos, y un tipo nuevo con fecha entra sin tocar nada.
+
+    El opt-out existe para el caso contrario, que la regla sola tampoco sabe
+    resolver: `Diagrama.version` es una fecha y no es un evento.
+    """
+    out = []
+    for type_name in sorted(contract.types):
+        spec = contract.types[type_name]
+        if spec.get("generated_only"):
+            continue
+        for name, field in (spec.get("fields") or {}).items():
+            if (isinstance(field, dict) and field.get("data_type") == "date"
+                    and field.get("timeline") is not False):
+                out.append((type_name, name))
+    return out
+
+
+def render_timeline_view(contract: Contract) -> str:
+    """La vista de eventos: qué pasó, en una sola lista ordenada."""
+    cfg = contract.projection.get("timeline", {})
+    view = cfg.get("view")
+    campos = timeline_fields(contract)
+    if not view or not campos:
+        return ""
+    docs = contract.projection.get("documents_table", "documentos")
+    key = _primary_key(contract, docs)
+    link = contract.projection.get("child_tables", {}).get("parent_column", "doc")
+    scope = cfg.get("scope_field", "proyecto")
+    partes = []
+    for type_name, field in campos:
+        table = type_name.lower()
+        tiene_scope = scope in (contract.types[type_name].get("fields") or {})
+        partes.append(
+            f'  select t.{_sql_ident(field)} as "fecha", '
+            f"'{type_name}' as \"tipo\", '{field}' as \"campo\",\n"
+            f'         d.{_sql_ident(key)} as {_sql_ident(link)}, d."title" as "title",\n'
+            f'         {("t." + _sql_ident(scope)) if tiene_scope else "null"} as {_sql_ident(scope)}\n'
+            f'    from {_sql_ident(table)} t '
+            f'join {_sql_ident(docs)} d on d.{_sql_ident(key)} = t.{_sql_ident(link)}')
+    orden = "desc" if str(cfg.get("order", "desc")).lower() == "desc" else "asc"
+    return (f"-- Un evento por campo fechado, no por documento: un tipo con dos\n"
+            f"-- fechas aporta dos filas, y por eso la vista lleva `campo`.\n"
+            f"CREATE VIEW {_sql_ident(view)} AS\n"
+            + "\n  union all\n".join(partes)
+            + f'\n  order by "fecha" {orden};')
 
 
 def build_indexes(contract: Contract, docs: List[Document],
