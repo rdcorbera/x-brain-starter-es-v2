@@ -1,4 +1,4 @@
-"""Validar: los 21 checks, en dos niveles.
+"""Validar: los 25 checks, en dos niveles.
 
 OKF comprueba la conformidad con la spec, que es deliberadamente permisiva;
 perfil comprueba lo nuestro, que puede endurecerse sin romper aquella."""
@@ -14,13 +14,14 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from .const import (DATE_RE, DATETIME_RE, DEFAULT_BUNDLE, ERROR,
                     GENERATED_MARK, INFO, SEVERITY_ORDER, WARNING)
-from .parse import (Contract, Document, HEADING_RE, HTML_COMMENT_RE,
+from .parse import (Contract, Document, HEADING_RE, HTML_COMMENT_RE, body_digest,
                     PLACEHOLDER_RE, ParseError, parse_frontmatter,
                     quote_scalar, quoting_preserves_meaning, scan_yaml_hazards)
 from .generate import (build_derived, build_indexes, build_stubs,
                        compose_derived, derived_is_current, json_schema_for,
                        location_patterns_for_match, period_segments,
-                       render_template, write_if_changed, write_text_lf)
+                       render_ddl, render_template, write_if_changed,
+                       write_text_lf)
 
 # ============================================================================
 # Findings
@@ -68,7 +69,9 @@ CHECKS = {
     "V20": ("profile", "las referencias por clave resuelven a un documento existente"),
     "V21": ("profile", "`periodo` sigue el formato declarado"),
     "V22": ("profile", "toda cita resuelve a un documento del bundle"),
+    "V23": ("profile", "el `resumen` sigue describiendo el cuerpo (`resumen_hash`)"),
     "V26": ("profile", "las líneas de un log con formato declarado lo cumplen"),
+    "V27": ("profile", "la clave de un tipo no la repiten dos documentos"),
 }
 
 
@@ -246,6 +249,7 @@ class Validator:
             self.check_indexes()
             self.check_derived()
             self.check_generated()
+            self.check_unique_keys()
         return sorted(
             self.findings,
             key=lambda f: (SEVERITY_ORDER[f.severity], f.check, f.path, f.line),
@@ -357,6 +361,7 @@ class Validator:
         self.check_conditions(doc, type_name)
         self.check_classification(doc, type_name)
         self.check_stewardship(doc, type_name)
+        self.check_resumen(doc)
         self.check_placeholders(doc)
         self.check_links(doc)
 
@@ -503,6 +508,61 @@ class Validator:
                          f"{key_field} = `{value}`",
                          severity=WARNING)
 
+    def check_resumen(self, doc: Document) -> None:
+        """El `resumen` es el nivel que permite DESCARTAR un documento sin abrirlo.
+
+        Por eso su desfase es peor que su ausencia: sin resumen se abre el
+        documento y se pierde contexto; con uno desfasado se decide no abrirlo
+        creyendo algo que ya no dice. `resumen_hash` guarda el estado del cuerpo
+        cuando se escribió, y aquí se recalcula.
+
+        Es un aviso, no un error: el hash no puede saber si el cambio del cuerpo
+        afectó a lo que el resumen afirma -- corregir una errata no lo invalida.
+        Lo que sí sabe, y es lo único que hace falta, es que **nadie lo ha
+        vuelto a mirar desde entonces**.
+        """
+        declared = doc.meta.get("resumen_hash")
+        if not isinstance(declared, str) or not declared.strip():
+            return                        # su ausencia ya la reporta el campo
+        actual = body_digest(doc.text)
+        if declared.strip() != actual:
+            self.add("V23", doc.rel,
+                     "el cuerpo cambió desde que se escribió el `resumen`: "
+                     "reescríbelo si ya no lo describe, y recalcula el hash con "
+                     "`./brain hash --body --write` (nunca solo el hash)",
+                     severity=WARNING)
+
+    def check_unique_keys(self) -> None:
+        """Dos documentos del mismo tipo no pueden compartir su clave.
+
+        V20 comprueba que una referencia por clave RESUELVA, y eso no lo cubre:
+        con dos Iniciativa con el mismo `proyecto`, resolver encuentra una, y
+        encontrar una basta para que V20 calle. Pero entonces cada `proyecto:
+        <slug>` del cerebro apunta a dos sitios y nadie puede decir a cuál.
+
+        Es un check de bundle, como los índices: la unicidad es una propiedad
+        del conjunto, no de un archivo. Por eso no corre en modo `--staged`.
+        """
+        for type_name, spec in self.contract.types.items():
+            if not spec.get("key_unique"):
+                continue
+            field = self.contract.key_field(type_name)
+            if not field:
+                continue
+            seen: Dict[str, List[str]] = {}
+            for doc in self.docs:
+                if doc.type != type_name:
+                    continue
+                value = doc.meta.get(field)
+                if isinstance(value, str) and value.strip():
+                    seen.setdefault(value.strip(), []).append(doc.rel)
+            for value, paths in sorted(seen.items()):
+                for rel in sorted(paths)[1:]:
+                    self.add("V27", rel,
+                             f"`{field}` = `{value}` ya es de {sorted(paths)[0]}: "
+                             f"la clave de {type_name} identifica, y dos iguales "
+                             f"hacen ambigua toda referencia a ella")
+
     def check_conditions(self, doc: Document, type_name: str) -> None:
         for cond in self.contract.types[type_name].get("conditions", []):
             trigger = cond.get("if", {})
@@ -637,6 +697,7 @@ class Validator:
             expected[kernel / "schema" / "json" / f"{stem}.schema.json"] = (
                 json.dumps(json_schema_for(base, type_name), indent=2,
                            ensure_ascii=False) + "\n")
+        expected[kernel / "schema" / "ddl.sql"] = render_ddl(base)
         for rel, content in build_stubs(kernel).items():
             expected[kernel.parent / rel] = content
 

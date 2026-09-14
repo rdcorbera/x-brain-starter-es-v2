@@ -804,6 +804,13 @@ def build_document(path: Path, rows: int, source: Optional[str],
              # -- it needs a model, and this layer never calls one -- so it
              # leaves a marker for the agent, exactly as it does for
              # `description`. /x-procesar-inbox orders replacing both.
+             #
+             # And it deliberately does NOT write `resumen_hash` either. Sealing
+             # a marker would assert "this summary describes this body", which
+             # nobody has checked -- and it would leave V23 quiet when the agent
+             # later writes the real summary without touching the body. The
+             # missing field raises a warning, and that warning is exactly
+             # right: nobody has summarised this document yet.
              f"resumen: PENDIENTE. Redactar al integrar qué dice {path.name} "
              "y qué decide a quien lo lee.",
              "procedencia: fuente",

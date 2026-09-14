@@ -7,6 +7,7 @@ tags: []
 classification: internal          # mínimo de Pregunta: internal
 generated: {by: <by>, at: <at>}
 resumen: "<panorama en ~600 caracteres: qué dice este documento y qué decide quien lo lee>"
+resumen_hash: <sha256 del cuerpo, que imprime `./brain hash ARCHIVO --body` (o lo escribe `--write`)>
 procedencia: fuente          # fuente | dialogo | inferido | manual | derivado
 proyecto: transversal
 estado: abierta          # abierta | en-progreso | respondida

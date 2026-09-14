@@ -103,6 +103,25 @@ El slug lleva el periodo delante, como propone la plantilla: `2026-q3-migracion-
 `periodo` sigue la forma declarada en `cerebro/schema.json`, y la plantilla ya propone el
 ejemplo correcto — no hay que deducirla.
 
+**Antes de escribir nada, comprobar que el slug está libre.** La clave de una `Iniciativa` es
+su identidad: es lo que todos los demás documentos escriben en su campo `proyecto`, así que dos
+iniciativas con el mismo slug hacen ambigua **cada** referencia del cerebro.
+
+```bash
+grep -rl "^proyecto: <slug>$" cerebro/01-proyectos cerebro/04-archivo   # ¿ya existe?
+ls cerebro/01-proyectos/ cerebro/04-archivo/*/                          # y su carpeta
+```
+
+- **Si el slug ya existe**, no se crea nada: **se pregunta**. Casi siempre es una de dos cosas
+  —la iniciativa ya está abierta y lo que toca es trabajar sobre ella, o es una distinta que
+  necesita otro nombre— y solo el usuario sabe cuál. Si es un periodo nuevo de algo que ya
+  existió, el slug lleva su periodo delante y por eso no choca.
+- **Mirar también `04-archivo/`**, no solo los proyectos activos: reusar el slug de una
+  iniciativa cerrada rompe las referencias de todo lo que se archivó con ella.
+
+Esto es lo único que **previene** el duplicado. `V27` lo detecta después y el `UNIQUE` de la
+proyección impide que llegue a la base — pero para entonces los documentos ya están escritos.
+
 ### 2. La documentación inicial, si la hay
 
 1. **El original va a `raw/`** con su nombre `AAAA-MM-DD-descripcion-uuid.ext` y su fila en

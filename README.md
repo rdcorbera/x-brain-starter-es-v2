@@ -49,6 +49,7 @@ kernel/schema/contract.json      ← EL CONTRATO. Fuente única.
         │
         ├─ brain generate ─→ kernel/schema/templates/*.md      plantillas por tipo
         │                 ─→ kernel/schema/json/*.schema.json  JSON Schema, para tooling estándar
+        │                 ─→ kernel/schema/ddl.sql             el esquema SQL de la proyección
         │                 ─→ .claude/skills/ y .github/prompts/  ambos árboles de stubs
         │
         ├─ brain init ────→ cerebro/ESQUEMA.md   el esquema legible y portable
@@ -56,8 +57,14 @@ kernel/schema/contract.json      ← EL CONTRATO. Fuente única.
         │
         ├─ brain index ───→ cerebro/**/index.md
         ├─ brain derive ──→ PREGUNTAS-ABIERTAS.md, GOALS.md, ORGANIGRAMA.md
-        └─ (corte 2) ─────→ el DDL de SQLite
+        └─ brain project ─→ --ddl: el mismo esquema, ya con los tipos propios de este cerebro
 ```
+
+**El esquema SQL no se escribe a mano.** Una tabla por tipo, `documentos` con los campos
+comunes, y tabla hija para cada campo estructurado — `sources` y `verified` con una columna por
+miembro, no un JSON opaco. Las tablas son `STRICT` y cada enum lleva su `CHECK`, así que el
+motor rechaza lo que el contrato no admite. Agregar un campo —o un tipo de dato entero— cambia
+el DDL **sin tocar una línea de código**, y el round-trip lo comprueba agregando uno.
 
 Todo lo de la derecha es **generado**: no se edita, se regenera — y **V14 lo comprueba**. Añadir un valor de enum es una línea en `contract.json`; en v1 era un grep manual sobre 15 archivos de prosa que rompía tres skills en silencio.
 
@@ -153,7 +160,7 @@ Un `cerebro/` compartido sigue siendo OKF-válido aunque no cumpla nuestro perfi
 
 ## Estado
 
-**Hecho** — corte 1: el contrato con 14 tipos, el validador de 23 checks, la capa de gobierno de datos (clasificación, responsabilidad, aplicación en pre-commit y CI), el enrutamiento (`./brain place`), la generación de plantillas, JSON Schemas, esquema portable, índices y derivados, `./brain init`, el conversor de insumos sin dependencias, el test de round-trip y los dos preflight. **Y la prosa del kernel** — `AGENTS.md`, la guía de uso, la instalación y el changelog—, escrita al final y contra un inventario regla por regla de v1: cada regla que desapareció nombra el comando que la sustituye.
+**Hecho** — corte 1: el contrato con 14 tipos, el validador de 25 checks, la capa de gobierno de datos (clasificación, responsabilidad, aplicación en pre-commit y CI), el enrutamiento (`./brain place`), la generación de plantillas, JSON Schemas, esquema portable, índices y derivados, `./brain init`, el conversor de insumos sin dependencias, el test de round-trip y los dos preflight. **Y la prosa del kernel** — `AGENTS.md`, la guía de uso, la instalación y el changelog—, escrita al final y contra un inventario regla por regla de v1: cada regla que desapareció nombra el comando que la sustituye.
 
 **En curso** — corte 1, paso 8: los skills reescritos para invocar `./brain`. Hechos `/x-setup`, que pasa de una entrevista de 30 minutos a elegir un **profile de rol** y ajustarlo en unos cinco; `/x-nueva-iniciativa`, que abre un proyecto con su plan y su documentación inicial ya procesada — y deja que `GOALS.md` se genere solo; `/x-consultar`, que responde con la fuente de cada afirmación, ofrece archivar la síntesis y **registra la consulta** en un log nuevo; `/x-procesar-inbox`, el ritual diario que archiva, convierte e integra todo lo que entra; y `/x-decision`, que valida una decisión contra lo ya decidido antes de escribirla. Quedan 11 skills, y después la migración del cerebro en producción.
 

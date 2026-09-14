@@ -33,6 +33,26 @@ permiten **descartar** un documento sin abrirlo. No es una tabla de contenidos n
 frase de cada sección — eso no deja descartar nada. Se escribe al ingerir, y es lo que evita que
 responder una pregunta cueste abrir cinco documentos enteros.
 
+**Y cuando escribas un `resumen`, sella el cuerpo:**
+
+```bash
+./brain hash <archivo> --body --write     # escribe `resumen_hash` en el frontmatter
+```
+
+Un resumen desfasado **es peor que no tenerlo**: sin resumen se abre el documento y se pierde
+contexto; con uno que ya no describe el cuerpo, se decide *no* abrirlo creyendo algo que dejó de
+ser cierto. `resumen_hash` guarda el estado del cuerpo en el momento en que lo escribiste, y
+**V23** avisa cuando el cuerpo cambió después.
+
+Dos cosas que no son negociables aquí:
+
+- **El comando afirma algo, así que se corre cuando acabas de escribir los dos** —el resumen y el
+  cuerpo—, nunca en lote sobre documentos que no has leído. Sellar a ciegas apaga V23 sin que
+  nadie haya comprobado nada.
+- **`validate --fix` no lo toca, a propósito.** Recalcular el hash silenciaría el aviso sin
+  arreglar el resumen, que es falsificar la garantía en vez de repararla. Si V23 salta: relee,
+  reescribe el resumen si hace falta, y entonces vuelve a sellar.
+
 **La regla que ordena tu trabajo: si hay un comando, se usa el comando.** No porque sea más
 elegante, sino porque el modo alternativo —leer una especificación y escribir a mano— cuesta
 tokens y se equivoca. `./brain template Reunion` cuesta unos 200 tokens; leer el esquema
@@ -51,6 +71,8 @@ completo para deducir lo mismo, unos 10.000.
 | Leer un `.pdf`, `.docx`, `.pptx`, `.xlsx` o `.drawio` | `./brain kernel/bin/to-markdown.py <archivo>` |
 | Comprobar que los originales de `raw/` no han cambiado | `./brain verify-raw` |
 | Calcular el SHA-256 de un original, para su fila del manifiesto | `./brain hash <archivo>` |
+| Ver el esquema SQL de la proyección de este cerebro | `./brain project --ddl` |
+| Sellar un `resumen` recién escrito contra su cuerpo | `./brain hash <archivo> --body --write` |
 
 **Un artefacto generado no se edita: se regenera.** Si algo generado está mal, lo que está mal
 es `kernel/schema/contract.json`. Editar la salida es trabajo que se pierde en la siguiente
@@ -278,7 +300,7 @@ x-brain/
 │   │   │   ├── const.py          ←   el vocabulario compartido
 │   │   │   ├── parse.py          ←   LEER: OKF-YAML, documentos, contrato, moldes
 │   │   │   ├── generate.py       ←   ESCRIBIR: plantillas, índices, derivados, stubs
-│   │   │   ├── validate.py       ←   COMPROBAR: los 23 checks, en dos niveles
+│   │   │   ├── validate.py       ←   COMPROBAR: los 25 checks, en dos niveles
 │   │   │   └── report.py         ←   RENDIR: lo que los otros tres encontraron
 │   │   ├── to-markdown.py         ← insumos binarios → markdown (cero tokens)
 │   │   ├── survey.py             ← preflight: dónde se van los tokens
@@ -286,7 +308,8 @@ x-brain/
 │   ├── schema/
 │   │   ├── contract.json         ← EL CONTRATO. Fuente única de todo lo demás
 │   │   ├── templates/*.md        ← plantilla por tipo (generadas)
-│   │   └── json/*.schema.json    ← JSON Schema por tipo (generados)
+│   │   ├── json/*.schema.json    ← JSON Schema por tipo (generados)
+│   │   └── ddl.sql               ← esquema SQL de la proyección (generado)
 │   ├── scaffold/                 ← lo que `./brain init` deja en un cerebro nuevo
 │   │   └── profiles/             ← los profiles de rol del kernel (init NO los copia)
 │   ├── modulos/                  ← la lógica de los skills

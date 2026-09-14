@@ -13,11 +13,11 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from .const import (DATE_RE, DEFAULT_BUNDLE, GENERATED_MARK, VERSION,
-                    WARNING)
+from .const import (DATE_RE, DEFAULT_BUNDLE, GENERATED_MARK,
+                    GENERATED_MARK_SQL, VERSION, WARNING)
 from .parse import (Contract, Document, ParseError, parse_frontmatter,
                     read_frontmatter, quote_scalar, quoting_preserves_meaning,
-                    scan_yaml_hazards)
+                    scan_yaml_hazards, split_document, digest_body)
 
 PLACEHOLDER_IN_PATH = re.compile(r"\{(\w+)\}")
 
@@ -200,7 +200,7 @@ def json_schema_for(contract: Contract, type_name: str) -> dict:
     for name, field in contract.fields_for(type_name).items():
         if field.get("deprecated_by"):
             continue
-        properties[name] = _json_schema_field(field)
+        properties[name] = _json_schema_field(field, contract)
         if field.get("required"):
             required.append(name)
     return {
@@ -214,32 +214,201 @@ def json_schema_for(contract: Contract, type_name: str) -> dict:
     }
 
 
-_JSON_TYPES = {
-    "text": {"type": "string"}, "sentence": {"type": "string"},
-    "boolean": {"type": "boolean"}, "link": {"type": "string"},
-    "typed-ref": {"type": "string"}, "actor": {"type": "string"},
-    "date": {"type": "string", "format": "date"},
-    "datetime": {"type": "string", "format": "date-time"},
-}
+def _json_schema_field(field: Dict[str, Any], contract: Contract) -> dict:
+    """Un campo, en JSON Schema. El mapa vive en el contrato, como el de SQL.
 
-
-def _json_schema_field(field: Dict[str, Any]) -> dict:
+    Estuvo hardcodeado aquí hasta el 2026-09-13, que es el patrón que D2
+    rechazó para el DDL: un `data_type` nuevo se habría proyectado en silencio
+    como `string`. Ahora los dos generadores leen del mismo sitio, y un tipo de
+    dato nuevo sin su mapa se nota en vez de degradar.
+    """
     kind = field.get("data_type", "text")
-    if kind == "enum":
+    spec = contract.data_types.get(kind, {})
+    mapping = spec.get("json", {}) if isinstance(spec, dict) else {}
+    strategy = mapping.get("strategy")
+    if strategy == "enum_values":
         return {"type": "string", "enum": field.get("values", [])}
-    if kind == "list":
-        return {"type": "array", "items": _json_schema_field({"data_type": field.get("of", "text")})}
-    if kind == "map":
-        members = {k: _json_schema_field(v) for k, v in field.get("fields", {}).items()
-                   if isinstance(v, dict)}
+    if strategy == "array_of":
+        element = {"data_type": field.get("of", "text")}
+        return {"type": "array", "items": _json_schema_field(element, contract)}
+    if strategy == "object_of_fields":
+        members = {k: _json_schema_field(v, contract)
+                   for k, v in field.get("fields", {}).items() if isinstance(v, dict)}
         return {
             "type": "object",
             "properties": members,
             "required": [k for k, v in field.get("fields", {}).items()
                          if isinstance(v, dict) and v.get("required")],
         }
-    return dict(_JSON_TYPES.get(kind, {"type": "string"}))
+    return {k: v for k, v in mapping.items() if k != "strategy"} or {"type": "string"}
 
+
+# --- la proyección: el DDL, que es otro artefacto generado desde el contrato ---
+#
+# Aquí se produce el TEXTO del DDL, no la base. Aplicarlo y poblarlo es trabajo
+# del proyector (T5), y vive aparte a propósito: si el DDL se renderizara allí,
+# `generate` tendría que importar hacia la derecha y el corte por trabajos se
+# rompería. De paso, `generate` y el round-trip siguen sin importar `sqlite3`,
+# así que el DDL se verifica en CI aunque la máquina no pueda alojar una base.
+
+
+def _sql_ident(name: str) -> str:
+    """Identificador SQL. Entrecomillar siempre sale gratis y elimina de golpe
+    la clase entera de choques con palabras reservadas."""
+    return '"' + name.lower().replace("-", "_") + '"'
+
+
+def _sql_of(contract: Contract, field: Dict[str, Any]) -> Dict[str, Any]:
+    spec = contract.data_types.get(field.get("data_type", "text"), {})
+    return spec.get("sql", {}) if isinstance(spec, dict) else {}
+
+
+def _sql_column(contract: Contract, name: str, field: Dict[str, Any],
+                prefix: str = "", unique: bool = False) -> str:
+    """Una columna, con su tipo, su nulabilidad y su CHECK si es un enum."""
+    sql = _sql_of(contract, field)
+    col = _sql_ident(f"{prefix}{name}")
+    parts = [f"{col} {sql.get('type', 'TEXT')}"]
+    # null_rule del contrato: un `required` relajado a warning es uno hacia el
+    # que el corpus todavía migra. Proyectarlo NOT NULL sería una regla más
+    # estricta que la del propio contrato, y el proyector rechazaría documentos
+    # que el validador solo avisa.
+    if field.get("required") and field.get("severity") not in (WARNING, "info"):
+        parts.append("NOT NULL")
+    if unique:
+        parts.append("UNIQUE")
+    if sql.get("check") == "in_values" and field.get("values"):
+        allowed = ", ".join("'" + str(v).replace("'", "''") + "'"
+                            for v in field["values"])
+        parts.append(f"CHECK ({col} IN ({allowed}))")
+    return " ".join(parts)
+
+
+def _sql_members(contract: Contract, field: Dict[str, Any]) -> Dict[str, Any]:
+    return {k: v for k, v in (field.get("fields") or {}).items()
+            if isinstance(v, dict)}
+
+
+def _sql_child_table(contract: Contract, parent: str, field_name: str,
+                     field: Dict[str, Any]) -> str:
+    """Un campo `list` es una tabla hija, nunca texto con comas.
+
+    Con `of: map` cada miembro es su propia columna -- que es lo que separa a
+    `sources` y `verified` de una tabla de unión de dos columnas.
+    """
+    cfg = contract.projection.get("child_tables", {})
+    name = cfg.get("name_pattern", "{parent}_{field}").format(
+        parent=parent, field=field_name)
+    parent_col = _sql_ident(cfg.get("parent_column", "doc"))
+    order_col = _sql_ident(cfg.get("order_column", "idx"))
+    cols = [f"{parent_col} TEXT NOT NULL REFERENCES {_sql_ident(parent)}"
+            f"({_sql_ident(_primary_key(contract, parent))}) ON DELETE CASCADE",
+            f"{order_col} INTEGER NOT NULL"]
+    of = field.get("of", "text")
+    if of == "map":
+        for member, spec in _sql_members(contract, field).items():
+            cols.append(_sql_column(contract, member, spec))
+    else:
+        element = {"data_type": of, "required": True}
+        cols.append(_sql_column(contract, cfg.get("value_column", "value"), element))
+    cols.append(f"PRIMARY KEY ({parent_col}, {order_col})")
+    return _sql_create(name, cols)
+
+
+def _primary_key(contract: Contract, table: str) -> str:
+    """`documentos` se identifica por su ruta; una tabla de tipo, por `doc`."""
+    if table == contract.projection.get("documents_table", "documentos"):
+        for name, spec in contract.projection.get("synthetic_columns", {}).items():
+            if isinstance(spec, dict) and spec.get("role") == "primary_key":
+                return name
+    return contract.projection.get("child_tables", {}).get("parent_column", "doc")
+
+
+def _sql_create(name: str, columns: List[str]) -> str:
+    body = ",\n".join(f"  {c}" for c in columns)
+    return f"CREATE TABLE {_sql_ident(name)} (\n{body}\n) STRICT;"
+
+
+def _sql_fields(contract: Contract, fields: Dict[str, Any], prefix: str = "",
+                unique_field: Optional[str] = None
+                ) -> Tuple[List[str], List[Tuple[str, Dict[str, Any]]]]:
+    """Reparte los campos en columnas y en tablas hijas, según su estrategia."""
+    columns: List[str] = []
+    children: List[Tuple[str, Dict[str, Any]]] = []
+    for name, field in fields.items():
+        if not isinstance(field, dict) or field.get("deprecated_by"):
+            continue
+        strategy = _sql_of(contract, field).get("strategy")
+        if strategy == "child_table":
+            children.append((name, field))
+        elif strategy == "inline_columns":
+            # Un map aplanado hereda la exigencia del padre. `generated` es
+            # `required` pero con severidad relajada: si sus columnas salieran
+            # NOT NULL, el proyector rechazaría un documento que el contrato
+            # acepta -- una regla más estricta que la del propio contrato.
+            relaxed = (not field.get("required")
+                       or field.get("severity") in (WARNING, "info"))
+            for member, spec in _sql_members(contract, field).items():
+                spec = dict(spec) if not relaxed else {**spec, "required": False}
+                columns.append(_sql_column(contract, member, spec,
+                                           prefix=f"{name}_"))
+        else:
+            columns.append(_sql_column(contract, name, field, prefix=prefix,
+                                       unique=(name == unique_field)))
+    return columns, children
+
+
+def render_ddl(contract: Contract) -> str:
+    """El esquema SQL entero, derivado del contrato: ni una tabla escrita a mano.
+
+    Agregar un campo -- o un `data_type` nuevo -- cambia este archivo sin tocar
+    una línea de código. Es el criterio de aceptación de T4, y la razón de que
+    el mapa a tipos SQL viva en el contrato y no aquí.
+    """
+    proj = contract.projection
+    if not proj:
+        raise SystemExit("error: el contrato no declara el bloque `projection`")
+    docs = proj.get("documents_table", "documentos")
+    out = [GENERATED_MARK_SQL, "",
+           "-- Las claves foráneas no están activas por defecto en SQLite: hay",
+           "-- que pedirlo en cada conexión, o las referencias son decorativas.",
+           "PRAGMA foreign_keys = ON;", ""]
+
+    columns = []
+    for name, spec in proj.get("synthetic_columns", {}).items():
+        if not isinstance(spec, dict):
+            continue                      # `note`: prosa para quien lea el contrato
+        col = f"{_sql_ident(name)} {spec.get('sql', {}).get('type', 'TEXT')} NOT NULL"
+        columns.append(col + (" PRIMARY KEY" if spec.get("role") == "primary_key" else ""))
+    common_cols, common_children = _sql_fields(contract, contract.common)
+    out.append(_sql_create(docs, columns + common_cols))
+    out.append("")
+    for field_name, field in common_children:
+        out.append(_sql_child_table(contract, docs, field_name, field))
+        out.append("")
+
+    for type_name in sorted(contract.types):
+        spec = contract.types[type_name]
+        if spec.get("generated_only"):
+            continue                      # nunca es un documento escrito: no se proyecta
+        own = {k: v for k, v in (spec.get("fields") or {}).items()
+               if k not in contract.common}
+        table = type_name.lower()
+        # La clave de un tipo que se declara única lo es también para el motor.
+        type_cols, type_children = _sql_fields(
+            contract, own,
+            unique_field=spec.get("key") if spec.get("key_unique") else None)
+        pk = _sql_ident(_primary_key(contract, table))
+        out.append(_sql_create(table, [
+            f"{pk} TEXT NOT NULL PRIMARY KEY REFERENCES {_sql_ident(docs)}"
+            f"({_sql_ident(_primary_key(contract, docs))}) ON DELETE CASCADE"
+        ] + type_cols))
+        out.append("")
+        for field_name, field in type_children:
+            out.append(_sql_child_table(contract, table, field_name, field))
+            out.append("")
+
+    return "\n".join(out).rstrip() + "\n"
 
 def build_indexes(contract: Contract, docs: List[Document],
                   bundle: Path) -> Dict[Path, str]:
@@ -305,17 +474,6 @@ def _derived_frontmatter(contract: Contract, name: str) -> List[str]:
     lines.append(f"generated: {{by: process:brain-derive, at: {stamp}}}")
     lines += ["---", ""]
     return lines
-
-
-def split_document(text: str) -> Tuple[str, str]:
-    """Split a file into (frontmatter block, body)."""
-    lines = text.splitlines()
-    if not lines or lines[0].strip() != "---":
-        return "", text
-    for idx in range(1, len(lines)):
-        if lines[idx].strip() == "---":
-            return "\n".join(lines[:idx + 1]), "\n".join(lines[idx + 1:])
-    return "", text
 
 
 def derived_is_current(path: Path, body: str) -> bool:
@@ -637,15 +795,24 @@ def render_bundle_schema(contract: Contract) -> str:
 _DATA_TYPE_HINTS: Dict[str, str] = {}
 
 
-def bundle_schema_frontmatter(contract: Contract) -> str:
-    """Header for the bundle schema, with a fresh generation timestamp."""
+def bundle_schema_frontmatter(contract: Contract, body: str = "") -> str:
+    """Header for the bundle schema, with a fresh generation timestamp.
+
+    Lleva `resumen_hash` como cualquier otro documento: el sistema no puede
+    publicar un esquema que incumple el contrato que ese mismo esquema
+    describe. Aquí además es el único caso en que el hash se calcula solo sin
+    afirmar nada de más -- el generador acaba de escribir ese cuerpo, así que
+    sí sabe que el resumen y el cuerpo son de la misma corrida.
+    """
     spec = contract.data.get("bundle_schema", {})
     stamp = datetime.now().astimezone().replace(microsecond=0).isoformat()
+    digest = digest_body(body)
     return "\n".join([
         "---", f"type: {spec.get('type', 'Indice')}",
         f"title: {quote_scalar(spec.get('title', 'Esquema'))}",
         f"description: {quote_scalar(spec.get('description', ''))}",
         f"resumen: {quote_scalar(spec.get('resumen', ''))}",
+        f"resumen_hash: {digest}",
         "procedencia: derivado",
         f"classification: {contract.classification.get('default_min', 'internal')}",
         "tags: [generado, esquema]",
@@ -697,7 +864,7 @@ def write_bundle_schema(contract: Contract, bundle: Path) -> bool:
     body = render_bundle_schema(contract)
     if derived_is_current(bundle / rel, body):
         return False
-    write_if_changed(bundle / rel, bundle_schema_frontmatter(contract) + body)
+    write_if_changed(bundle / rel, bundle_schema_frontmatter(contract, body) + body)
     return True
 
 

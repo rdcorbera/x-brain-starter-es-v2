@@ -480,6 +480,99 @@ def check_competency_questions(contract) -> List[str]:
     return problems
 
 
+def check_ddl(contract) -> List[str]:
+    """El DDL se genera, el motor lo acepta, y un campo nuevo llega solo.
+
+    Los tres criterios de aceptación de T4, comprobados como se comprueban las
+    cosas aquí: ejecutándolos. Que el DDL «parezca» SQL válido no dice nada --
+    STRICT, los CHECK de enum y las claves foráneas o los acepta SQLite o no.
+    Y «agregar un campo al contrato cambia el DDL sin tocar código» se verifica
+    agregando uno, no leyendo el generador.
+    """
+    problems = []
+    ddl = brain.render_ddl(contract)
+
+    try:
+        import sqlite3
+    except ImportError:                      # mismo trato que PyYAML: se dice
+        print("  (sqlite3 no disponible: el DDL no se ejecutó contra el motor)")
+    else:
+        try:
+            db = sqlite3.connect(":memory:")
+            db.executescript(ddl)
+            tablas = {r[0] for r in db.execute(
+                "select name from sqlite_master where type='table'")}
+            db.close()
+        except sqlite3.Error as exc:
+            problems.append(f"SQLite rechaza el DDL generado: {exc}")
+        else:
+            esperadas = {t.lower() for t in contract.types
+                         if not contract.types[t].get("generated_only")}
+            faltan = esperadas - tablas
+            if faltan:
+                problems.append("tipos del contrato sin tabla en el DDL: "
+                                + ", ".join(sorted(faltan)))
+            if "Indice" in contract.types and "indice" in tablas:
+                problems.append("`Indice` es generado y no debería proyectarse")
+
+    # T4, criterio 2: el contrato manda, y manda solo.
+    sonda_campo = {"data_type": "enum", "values": ["si", "no"], "required": True}
+    contract.common["campo_sonda"] = sonda_campo
+    contract.data_types["sonda"] = {"note": "probe", "sql": {"type": "REAL"}}
+    contract.common["medida_sonda"] = {"data_type": "sonda"}
+    try:
+        con_sonda = brain.render_ddl(contract)
+    finally:
+        del contract.common["campo_sonda"]
+        del contract.common["medida_sonda"]
+        del contract.data_types["sonda"]
+    if '"campo_sonda" TEXT NOT NULL CHECK' not in con_sonda:
+        problems.append("un campo nuevo del contrato no llega al DDL con su tipo "
+                        "y su CHECK: el generador no está derivando del contrato")
+    if '"medida_sonda" REAL' not in con_sonda:
+        problems.append("un `data_type` nuevo no llega al DDL: su mapa a SQL no "
+                        "se está leyendo del contrato")
+
+    # La vista de eventos (T6) todavía no existe, pero su regla ya está
+    # declarada, y una declaración que nadie comprueba es cómo se cuela una
+    # afirmación de control sin control. Dos cosas baratas la sostienen:
+    # que el opt-out solo se declare donde tiene efecto, y que la lista del
+    # contrato diga la verdad en vez de ser una copia que se desincroniza.
+    timeline = contract.projection.get("timeline", {})
+    if timeline:
+        declarado, fuera = [], []
+        for type_name, spec in contract.types.items():
+            for name, field in (spec.get("fields") or {}).items():
+                if not isinstance(field, dict) or "timeline" not in field:
+                    continue
+                declarado.append(f"{type_name}.{name}")
+                if field.get("data_type") != "date":
+                    problems.append(f"{type_name}.{name} declara `timeline` sin ser "
+                                    f"un campo `date`: la clave no tendría efecto")
+                if field.get("timeline") is False:
+                    fuera.append(f"{type_name}.{name}")
+        if sorted(fuera) != sorted(timeline.get("opted_out", [])):
+            problems.append(
+                "`projection.timeline.opted_out` no coincide con los campos que "
+                f"declaran `timeline: false` (contrato: {sorted(fuera)}, "
+                f"lista: {sorted(timeline.get('opted_out', []))})")
+        if not [f for t_, s in contract.types.items()
+                for f, spec_ in (s.get("fields") or {}).items()
+                if isinstance(spec_, dict) and spec_.get("data_type") == "date"
+                and spec_.get("timeline") is not False]:
+            problems.append("ningún campo entraría en la vista de eventos")
+
+    # El mapa a JSON Schema vive en el mismo sitio desde el 2026-09-13, así que
+    # se comprueba igual: los dos generadores derivan del contrato o ninguno.
+    for kind, spec in contract.data_types.items():
+        if isinstance(spec, dict) and "json" not in spec:
+            problems.append(f"el `data_type` `{kind}` no declara su mapa a JSON "
+                            f"Schema: se proyectaría como `string` en silencio")
+        if isinstance(spec, dict) and "sql" not in spec:
+            problems.append(f"el `data_type` `{kind}` no declara su mapa a SQL")
+    return problems
+
+
 def check_layering() -> List[str]:
     """El corte por trabajos sigue siendo un corte.
 
@@ -538,7 +631,7 @@ def main() -> int:
     failures = (check_provenance(contract) + check_yaml_compatibility(contract)
                 + check_locations(contract) + check_derived_specs(contract)
                 + check_period_formats(contract) + check_role_profiles(contract)
-                + check_layering() + check_init(contract)
+                + check_layering() + check_ddl(contract) + check_init(contract)
                 + check_competency_questions(contract))
 
     try:
@@ -575,7 +668,8 @@ def main() -> int:
         return 1
 
     profiles = brain.find_profiles(ROOT / "kernel")
-    print(f"OK -- provenance completo, derivados consistentes, formas de periodo "
+    print(f"OK -- provenance completo, derivados consistentes, el DDL lo acepta "
+          f"SQLite y deriva del contrato, formas de periodo "
           f"disjuntas, los {len(profiles)} profiles de rol completos, las capas "
           f"sin ciclos, `init` idempotente y validando, las competency questions "
           f"cuadran con el contrato, y las plantillas de los {len(tested)} tipos, "

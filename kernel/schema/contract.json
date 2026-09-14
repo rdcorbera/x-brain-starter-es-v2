@@ -1,5 +1,5 @@
 {
-  "note": "Single source of truth for this brain's data contract. Templates, JSON Schemas, the catalog, the portable bundle schema, the skill stubs, the directory indexes, the derived indexes and (in cut 2) the SQLite DDL are all GENERATED from this file. Never edit a generated artifact; edit this and run `brain generate`. READING ORDER -- the top-level keys are ordered as a narrative, separated by blank lines, rather than nested into groups: (1) what this contract is -- note, versions, provenance, governance, and the policies it is written under; (2) the vocabulary the schema is written in -- data types, actors, and the classification ladder, each defined before it is used; (3) the schema itself -- common_fields and types, which are 59% of the file; (4) the files it produces -- reserved, exempt, derived, and the portable bundle schema. Grouping these into nested objects was considered and rejected: the groups are wildly uneven, the boundaries are genuinely ambiguous (classification is both vocabulary and policy), and nesting would lengthen every access path and every provenance entry for no functional gain.",
+  "note": "Single source of truth for this brain's data contract. Templates, JSON Schemas, the catalog, the portable bundle schema, the skill stubs, the directory indexes, the derived indexes and (in cut 2) the SQLite DDL are all GENERATED from this file. Never edit a generated artifact; edit this and run `brain generate`. READING ORDER -- the top-level keys are ordered as a narrative, separated by blank lines, rather than nested into groups: (1) what this contract is -- note, versions, provenance, governance, and the policies it is written under; (2) the vocabulary the schema is written in -- data types, actors, and the classification ladder, each defined before it is used; (3) the schema itself -- common_fields and types, which are 59% of the file; (4) the files it produces -- reserved, exempt, derived, the portable bundle schema and the SQLite projection. Grouping these into nested objects was considered and rejected: the groups are wildly uneven, the boundaries are genuinely ambiguous (classification is both vocabulary and policy), and nesting would lengthen every access path and every provenance entry for no functional gain.",
   "okf_version": "0.2",
   "profile_version": 2,
 
@@ -21,7 +21,7 @@
       "common_fields.stale_after"
     ],
     "from_v1": ["common_fields.timestamp"],
-    "from_x_brain": ["common_fields.classification", "common_fields.resumen", "common_fields.procedencia"],
+    "from_x_brain": ["common_fields.classification", "common_fields.resumen", "common_fields.resumen_hash", "common_fields.procedencia"],
     "ours": "Everything not listed above. OKF leaves `type` producer-defined and takes no position on a field-level type system, data classification, stewardship, derived files, severity policy or generation -- which is most of this file by volume. Our additions extend the standard; they never contradict it, and the validator keeps the two levels apart so a bundle stays OKF-conformant even when it fails our profile.",
     "completeness_rule": "Every entry of `common_fields` must appear in exactly one of the three lists. A new common field therefore forces a conscious answer to 'is this the standard's or ours?', which is the question the old filename made impossible to answer. Enforced by kernel/tests/test_roundtrip.py."
   },
@@ -79,19 +79,19 @@
   },
 
   "data_types": {
-    "text":       { "note": "single-line string" },
-    "sentence":   { "note": "single-line string, one sentence", "max_chars": 200 },
-    "date":       { "note": "YYYY-MM-DD" },
-    "datetime":   { "note": "ISO 8601 with an explicit UTC offset, e.g. 2026-08-28T14:00:00Z" },
-    "boolean":    { "note": "true | false" },
-    "enum":       { "note": "one of `values`" },
-    "list":       { "note": "inline [a, b] or block; element type in `of`" },
-    "link":       { "note": "bundle-relative path starting with /, or the reserved /raw/ pointer" },
-    "typed-ref":  { "note": "link whose target must carry the type named in `to`" },
-    "type-key":   { "hint": "el slug del proyecto; `transversal` si no pertenece a ninguno", "note": "reference by KEY VALUE rather than by path: the value must match the `key` field of some document of type `to`. Exists because `proyecto: 2026-q3-erp` is written that way in every document in production -- turning it into a link would be a corpus migration. `sentinels` lists values that are valid without resolving." },
-    "person-ref": { "note": "accountability pointer. A bundle link to a Persona resolves and is checked; free text is tolerated and reported by V17 as unresolved stewardship. Migration-friendly by design: ownership becomes queryable progressively instead of behind a wall of errors." },
-    "actor":      { "note": "matches one of the patterns in `actors`" },
-    "map":        { "note": "single-level inline mapping; member types in `fields`" }
+    "text":       { "json": { "type": "string" }, "sql": { "type": "TEXT" }, "note": "single-line string" },
+    "sentence":   { "json": { "type": "string" }, "sql": { "type": "TEXT" }, "note": "single-line string, one sentence", "max_chars": 200 },
+    "date":       { "json": { "type": "string", "format": "date" }, "sql": { "type": "TEXT" }, "note": "YYYY-MM-DD" },
+    "datetime":   { "json": { "type": "string", "format": "date-time" }, "sql": { "type": "TEXT" }, "note": "ISO 8601 with an explicit UTC offset, e.g. 2026-08-28T14:00:00Z" },
+    "boolean":    { "json": { "type": "boolean" }, "sql": { "type": "INTEGER" }, "note": "true | false" },
+    "enum":       { "json": { "strategy": "enum_values" }, "sql": { "type": "TEXT", "check": "in_values" }, "note": "one of `values`" },
+    "list":       { "json": { "strategy": "array_of" }, "sql": { "strategy": "child_table" }, "note": "inline [a, b] or block; element type in `of`" },
+    "link":       { "json": { "type": "string" }, "sql": { "type": "TEXT" }, "note": "bundle-relative path starting with /, or the reserved /raw/ pointer" },
+    "typed-ref":  { "json": { "type": "string" }, "sql": { "type": "TEXT" }, "note": "link whose target must carry the type named in `to`" },
+    "type-key":   { "json": { "type": "string" }, "sql": { "type": "TEXT" }, "hint": "el slug del proyecto; `transversal` si no pertenece a ninguno", "note": "reference by KEY VALUE rather than by path: the value must match the `key` field of some document of type `to`. Exists because `proyecto: 2026-q3-erp` is written that way in every document in production -- turning it into a link would be a corpus migration. `sentinels` lists values that are valid without resolving." },
+    "person-ref": { "json": { "type": "string" }, "sql": { "type": "TEXT" }, "note": "accountability pointer. A bundle link to a Persona resolves and is checked; free text is tolerated and reported by V17 as unresolved stewardship. Migration-friendly by design: ownership becomes queryable progressively instead of behind a wall of errors." },
+    "actor":      { "json": { "type": "string" }, "sql": { "type": "TEXT" }, "note": "matches one of the patterns in `actors`" },
+    "map":        { "json": { "strategy": "object_of_fields" }, "sql": { "strategy": "inline_columns" }, "note": "single-level inline mapping; member types in `fields`" }
   },
   "actors": {
     "note": "Per OKF v0.2 section 7. Trust classification keys off the `human:` prefix, so it must be used for hand-authored or human-confirmed content. There is no `agent:` prefix -- agents use producer/version.",
@@ -225,6 +225,9 @@
       "hint": "el nivel intermedio de lectura: lo que permite DESCARTAR un documento sin abrirlo",
       "note": "L1 of the read budget (`read_budget`). Deliberately AUTHORED, not mechanically extracted from headings: a table of contents does not let a reader discard a document and an overview does. This is the field that attacks the 95% -- survey.py measured 3.285 tokens to find candidates and 61.731 to open them, so orientation is where the cost is. Written by the agent at ingest under human review; the deterministic layer only ever writes a MECHANICAL one, for generated indexes, where the summary genuinely is mechanical. Its staleness check (V23, against `resumen_hash`) arrives with T2: until then the field exists and nothing guards it drifting from the body."
     },
+    "resumen_hash": { "data_type": "text", "required": true, "severity": "warning",
+                      "placeholder": "sha256 del cuerpo, que imprime `./brain hash ARCHIVO --body` (o lo escribe `--write`)",
+                      "note": "SHA-256 of the BODY at the moment the `resumen` was written, so V23 can say the summary went stale. Hashes the body and never the frontmatter, because the value lives in the frontmatter and hashing itself would change what it hashes -- that is exactly why `path`/`hash` of the projection are NOT common fields, and why this one legitimately is. Required but relaxed while the corpus migrates: 301 documents predate it. NEVER filled in by `validate --fix`: recomputing it would silence V23 without anyone having checked that the summary still describes the body, which is falsifying the guarantee rather than repairing it. It is written by whoever writes the summary, in the same breath." },
     "procedencia": {
       "data_type": "enum",
       "values": ["fuente", "dialogo", "inferido", "manual", "derivado"],
@@ -251,6 +254,8 @@
       ],
       "filename": "CONTEXT.md",
       "key": "proyecto",
+      "key_unique": true,
+      "key_unique_note": "Two Iniciativa documents cannot share a slug. It is the identity every other type points at with `proyecto`, so a duplicate makes every reference ambiguous -- and V20 would not see it, because resolving finds one and finding one is enough. Enforced in three places, each doing what only it can: V27 catches it in an existing brain, the `UNIQUE` of the projection stops it reaching the database, and /x-nueva-iniciativa checks before creating, which is the only one that prevents it instead of reporting it.",
       "fields": {
         "proyecto": { "data_type": "text", "required": true, "is_key": true,
                       "placeholder": "slug de la carpeta, ej. 2026-q3-migracion-erp",
@@ -461,7 +466,8 @@
       "fields": {
         "proyecto": { "data_type": "type-key", "to": "Iniciativa", "sentinels": ["transversal"], "required": true, "default": "transversal" },
         "clase":    { "data_type": "enum", "values": ["flujo", "proceso", "secuencia", "entidades", "organizacion", "arquitectura", "cronograma", "otro"], "default": "flujo", "required": true },
-        "version":  { "data_type": "date", "required": true }
+        "version":  { "data_type": "date", "required": true, "timeline": false,
+                      "note": "A date by data type, but NOT an event: it is the version of the diagram, not something that happened. Without this opt-out the timeline view of T6 -- built from every `date` field, by rule and never by name -- would file three diagram updates alongside meetings and decisions. The rule stays mechanical so a new type still enters on its own; only a field with a reason opts out, and the reason is written here." }
       },
       "sections": [
         { "heading": "Diagrama", "guide": "bloque mermaid: flowchart, sequenceDiagram, erDiagram, graph TD", "required": true },
@@ -630,6 +636,39 @@
       "note": "v1 shipped this as type Diagrama with no proyecto, clase or version. Generating it supplies all three, so the defect becomes impossible rather than merely detectable. A missing reporta-a is a declared gap, rendered as such -- never inferred."
     }
   },
+  "projection": {
+    "note": "Cut-2 SQLite projection. Declared here rather than in the generator for the same reason as everything else in this file: `kernel/schema/ddl.sql` is a GENERATED artifact and V14 watches it, so whatever decides its content must be contract -- otherwise the DDL would have two sources of truth and the guard would only watch one. The acceptance criterion of T4 says it outright: adding a field, or a whole data type, must change the DDL WITHOUT touching code. The projection itself is derived and disposable: never versioned, rebuilt from the markdown, which stays the source of truth.",
+    "engine": "sqlite",
+    "engine_note": "Measured on the target machine: SQLite 3.50.4, the 8 capabilities the competency questions need, whole corpus projected in 32 ms. DuckDB was dropped -- its columnar advantage does not show at this size and its cost (a wheel to install where pip is restricted) does. `sqlite3` is stdlib, so the zero-dependency invariant reaches cut 2 intact.",
+    "documents_table": "documentos",
+    "strict_tables": true,
+    "identifier_rule": "Table and column identifiers are the type or field name, lowercased, with `-` replaced by `_`, and always double-quoted in the DDL. `fecha-creacion` becomes `fecha_creacion`. Quoting everything costs nothing and removes the whole class of reserved-word collisions.",
+    "null_rule": "A column is NOT NULL when its field is required AND its severity is not relaxed. A requirement carrying `severity: warning` is one the corpus is still migrating towards -- projecting it as NOT NULL would make the projector refuse documents that the validator merely warns about, which is a stricter rule than the contract's own. A `map` flattened into columns inherits its parent's requirement: `generated` is required but relaxed, so `generated_by` and `generated_at` are nullable -- otherwise the projector would refuse a document the contract accepts.",
+    "synthetic_columns": {
+      "note": "Columns the projector knows and that no document declares. They are deliberately NOT `common_fields`: that block is the contract of what someone WRITES, and a `path` written inside a document is a derived value stored by hand -- move the file and the field lies. A `hash` inside the content is worse, because writing it changes what it hashes. (`resumen_hash` of T2 is the legitimate case of the same shape: it hashes the BODY, not itself.)",
+      "path":         { "sql": { "type": "TEXT" }, "role": "primary_key", "from": "bundle-relative path of the file -- the identity of the row" },
+      "hash":         { "sql": { "type": "TEXT" }, "from": "SHA-256 of the file; T5 reprojects only what changed" },
+      "projected_at": { "sql": { "type": "TEXT" }, "from": "instant of the last projection of this row" }
+    },
+    "timeline": {
+      "note": "The event view of T6 is built from EVERY field with `data_type: date`, by rule and never by listing names -- listing them by hand is how the first version silently dropped `Pregunta.fecha-creacion` and `Plan.ultima-revision`. A field that is a date but not an event opts out with `timeline: false` and says why in its own `note`. Decided 2026-09-13, when counting against the generated DDL showed six date fields where the plan claimed five.",
+      "rule": "every field with data_type `date`, unless it declares `timeline: false`",
+      "opted_out": ["Diagrama.version"]
+    },
+    "child_tables": {
+      "note": "D3, option A: structured fields are normalised -- never a comma-joined string, never a JSON blob. `json1` is compiled in, but STRICT is what makes the engine reject the wrong type, and `sources`/`verified` are precisely the governance fields the competency questions ask about. Three rules and no per-name exceptions, so a new structured field grows its table without code.",
+      "name_pattern": "{parent}_{field}",
+      "parent_column": "doc",
+      "order_column": "idx",
+      "value_column": "value",
+      "rules": {
+        "list_of_scalar": "child table (doc, idx, value)",
+        "list_of_map":    "child table (doc, idx, one column per member of `fields`)",
+        "map":            "inline columns on the parent table, named `{field}_{member}`"
+      }
+    }
+  },
+
   "bundle_schema": {
     "common_heading": "Campos comunes",
     "note": "The single generated human-readable spec. A separate kernel-side CATALOGO.md existed and was deleted: it carried the same tables, and its only real advantage -- richer columns -- was an accident of improving one file and not the other. One derived spec, living where the documents are. Content of the portable ESQUEMA.md written into the bundle. It lives here rather than in code because it is content, not configuration: it is what someone who receives the `cerebro/` folder reads to understand it without the kernel. Spanish, like the rest of the bundle.",

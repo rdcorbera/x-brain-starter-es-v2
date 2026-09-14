@@ -7,8 +7,8 @@ El corte es **por trabajo, nunca arbitrario** — esa era la condición:
 
     const.py      el vocabulario compartido, que no es de nadie
     parse.py      LEER      OKF-YAML, documentos, contrato, moldes
-    generate.py   ESCRIBIR  plantillas, esquemas, índices, derivados, stubs
-    validate.py   COMPROBAR los 21 checks, en dos niveles
+    generate.py   ESCRIBIR  plantillas, esquemas, índices, derivados, stubs, DDL
+    validate.py   COMPROBAR los 25 checks, en dos niveles
     report.py     RENDIR    lo que los otros tres encontraron
 
 Las dependencias van en un solo sentido y no hay ciclos:
@@ -28,16 +28,16 @@ from __future__ import annotations
 from .const import (DATE_RE, DATETIME_RE, DEFAULT_BUNDLE, DEFAULT_CONTRACT,
                     ERROR, GENERATED_MARK, INFO, SEVERITY_ORDER,
                     USER_CONTRACT, VERSION, WARNING)
-from .parse import (Contract, Document, ParseError, find_profiles,
-                    frontmatter_block, parse_frontmatter, quote_scalar,
-                    quoting_preserves_meaning, read_frontmatter,
-                    scan_yaml_hazards)
+from .parse import (Contract, Document, ParseError, body_digest, digest_body,
+                    find_profiles, frontmatter_block, parse_frontmatter,
+                    quote_scalar, quoting_preserves_meaning, read_frontmatter,
+                    scan_yaml_hazards, split_document)
 from .generate import (build_derived, build_indexes, build_stubs,
                        bundle_schema_frontmatter, compose_derived,
                        derived_is_current, json_schema_for,
                        location_patterns_for_match, period_segments,
-                       render_bundle_schema, render_template,
-                       PRE_COMMIT_MARKER, resolve_locations, split_document,
+                       render_bundle_schema, render_ddl, render_template,
+                       PRE_COMMIT_MARKER, resolve_locations,
                        write_bundle_schema, write_if_changed, write_text_lf)
 from .validate import (CHECKS, Finding, Validator, apply_fixes, check_value,
                        fix_yaml_hazards, is_uninitialised, parse_instant,

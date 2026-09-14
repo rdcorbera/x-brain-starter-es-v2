@@ -84,7 +84,9 @@ Tres campos que necesitan criterio:
   (la escribió una persona). `inferido` solo si el agente la dedujo de una fuente, y entonces
   **no está verificada**: dilo en la respuesta.
 - **`resumen`** — el panorama que permite descartar este documento sin abrirlo. Para una decisión:
-  qué se decidió, contra qué alternativa y qué obliga. No repitas el `title`.
+  qué se decidió, contra qué alternativa y qué obliga. No repitas el `title`. **Al terminar el
+  documento, séllalo**: `./brain hash <archivo> --body --write` escribe `resumen_hash`, y V23
+  avisará si alguien cambia el cuerpo sin revisar el resumen.
 - **`# Citations`** — la reunión o la fuente donde se decidió. **Es obligatoria y ahora se
   comprueba**: una cita que no resuelve a un documento del cerebro es un error (V22). Si la fuente
   no está escrita todavía, eso es un hueco, no una cita.

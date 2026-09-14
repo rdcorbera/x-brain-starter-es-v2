@@ -146,7 +146,35 @@ def cmd_hash(args) -> int:
     path = Path(args.path)
     if not path.is_file():
         raise SystemExit(f"error: no encuentro `{path}`.")
-    print(sha256_of(path))
+    if not args.body:
+        print(sha256_of(path))
+        return 0
+
+    # --body hashea el CUERPO de un documento, que es lo que vigila `resumen_hash`.
+    # Existe porque un agente no puede calcular un SHA-256 a ojo: sin comando, el
+    # campo se rellenaría a mano y V23 vigilaría un número inventado.
+    text = path.read_text(encoding="utf-8")
+    digest = body_digest(text)
+    if not args.write:
+        print(digest)
+        return 0
+
+    block, body = split_document(text)
+    if not block:
+        raise SystemExit(f"error: `{path}` no tiene frontmatter.")
+    lines = block.splitlines()
+    linea = f"resumen_hash: {digest}"
+    for idx, raw in enumerate(lines):
+        if raw.split(":", 1)[0].strip() == "resumen_hash":
+            lines[idx] = linea
+            break
+    else:
+        lines.insert(len(lines) - 1, linea)     # antes del `---` de cierre
+    write_text_lf(path, "\n".join(lines) + "\n" + body.lstrip("\n"))
+    # Se dice lo que se acaba de afirmar. `--write` no comprueba que el resumen
+    # describa el cuerpo -- no puede: eso lo sabe quien lo escribió.
+    print(f"{path}: resumen_hash = {digest}")
+    print("       afirma que el `resumen` de este documento describe su cuerpo actual.")
     return 0
 
 
@@ -335,6 +363,14 @@ def cmd_generate(args) -> int:
                             schema):
             print(f"wrote  kernel/schema/json/{type_name.lower()}.schema.json")
 
+    # The DDL is rendered from the BASE contract, not the merged one: it is a
+    # kernel artifact, and V14 compares it against the kernel's contract. A
+    # brain with its own types gets its own DDL from `brain project --ddl`,
+    # which does merge -- but that output belongs to that brain, not here.
+    base = Contract.load(contract_path)
+    if write_if_changed(kernel / "schema" / "ddl.sql", render_ddl(base)):
+        print("wrote  kernel/schema/ddl.sql")
+
     # The bundle is NOT written here. `generate` produces the kernel's own
     # artifacts -- what CI checks is up to date -- while materialising a brain
     # is an act of setup and belongs to `init`. Mixing them meant the starter,
@@ -429,6 +465,23 @@ def cmd_init(args) -> int:
     return 0
 
 
+def cmd_project(args) -> int:
+    """La proyección consultable. Hoy, su esquema.
+
+    Imprime el DDL que sale del contrato de ESTE cerebro -- con sus tipos
+    propios si los tiene, porque aquí sí se mezcla `cerebro/schema.json`.
+    Aplicarlo y poblar la base es el proyector (T5), que llega después: por eso
+    este comando todavía no abre `sqlite3` ni toca disco.
+    """
+    contract = Contract.load(Path(args.contract), Path(args.bundle))
+    if args.ddl:
+        print(render_ddl(contract), end="")
+        return 0
+    print("error: por ahora `project` solo sabe `--ddl`; aplicar y poblar la "
+          "base llega con T5", file=sys.stderr)
+    return 2
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="brain.py", description=__doc__.split("\n")[0])
     parser.add_argument("--contract", default=str(DEFAULT_CONTRACT))
@@ -459,6 +512,10 @@ def main() -> int:
 
     p = sub.add_parser("hash", help="SHA-256 de un archivo, para el manifiesto de raw/")
     p.add_argument("path")
+    p.add_argument("--body", action="store_true",
+                   help="hashear solo el cuerpo del documento, para `resumen_hash`")
+    p.add_argument("--write", action="store_true",
+                   help="con --body: escribir el valor en el frontmatter del documento")
     p.set_defaults(func=cmd_hash)
 
     p = sub.add_parser("verify-raw", help="comprobar que los originales de raw/ no han cambiado")
@@ -491,6 +548,11 @@ def main() -> int:
 
     p = sub.add_parser("generate", help="regenerar todos los artefactos")
     p.set_defaults(func=cmd_generate)
+
+    p = sub.add_parser("project", help="la proyección SQLite (hoy: su esquema)")
+    p.add_argument("--ddl", action="store_true",
+                   help="imprimir el DDL que sale del contrato, sin tocar disco")
+    p.set_defaults(func=cmd_project)
 
     args = parser.parse_args()
     return args.func(args)

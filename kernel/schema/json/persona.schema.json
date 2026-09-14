@@ -76,6 +76,9 @@
     "resumen": {
       "type": "string"
     },
+    "resumen_hash": {
+      "type": "string"
+    },
     "procedencia": {
       "type": "string",
       "enum": [
@@ -104,6 +107,7 @@
     "classification",
     "generated",
     "resumen",
+    "resumen_hash",
     "procedencia",
     "rol"
   ]

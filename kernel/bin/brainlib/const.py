@@ -32,6 +32,11 @@ USER_CONTRACT = "schema.json"
 GENERATED_MARK = ("<!-- generado por brain.py — no editar a mano; "
                   "se edita kernel/schema/contract.json y se regenera -->")
 
+# La misma advertencia en el único comentario que SQL entiende. Misma razón que
+# la de arriba: la lee quien abre el archivo, no un programa.
+GENERATED_MARK_SQL = ("-- generado por brain.py — no editar a mano; "
+                      "se edita kernel/schema/contract.json y se regenera")
+
 ERROR, WARNING, INFO = "error", "warning", "info"
 SEVERITY_ORDER = {ERROR: 0, WARNING: 1, INFO: 2}
 

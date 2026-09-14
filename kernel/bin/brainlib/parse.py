@@ -5,6 +5,7 @@ texto en estructuras. Todo lo demás depende de esto y esto no depende de nada."
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -426,6 +427,7 @@ class Contract:
             lv["value"] for lv in self.classification.get("levels", [])
         ]
         self.provenance: Dict[str, Any] = data.get("provenance", {})
+        self.projection: Dict[str, Any] = data.get("projection", {})
         self.reserved: Dict[str, Any] = {
             k: v for k, v in data.get("reserved_files", {}).items()
             if k != "note" and isinstance(v, dict)
@@ -582,6 +584,47 @@ class Contract:
             if isinstance(section, dict):
                 out.append(section)
         return out
+
+
+def split_document(text: str) -> Tuple[str, str]:
+    """Split a file into (frontmatter block, body)."""
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return "", text
+    for idx in range(1, len(lines)):
+        if lines[idx].strip() == "---":
+            return "\n".join(lines[:idx + 1]), "\n".join(lines[idx + 1:])
+    return "", text
+
+
+def body_digest(text: str) -> str:
+    """SHA-256 del CUERPO de un documento, para `resumen_hash`.
+
+    Hashea el cuerpo y NUNCA el frontmatter, por una razón que decide el
+    diseño: el hash vive dentro del frontmatter, así que incluirlo sería
+    autorreferencial -- escribirlo cambiaría lo que hashea. Es la diferencia
+    entre este campo y el `hash` del proyector, que mira el archivo entero
+    desde fuera.
+
+    La normalización es deliberadamente mínima -- saltos a LF y sin blancos al
+    final -- porque el trabajo del campo es detectar que el cuerpo cambió. Con
+    más normalización, un cambio de verdad podría pasar desapercibido; con
+    menos, un final de línea de Windows daría una falsa alarma.
+    """
+    return digest_body(split_document(text)[1])
+
+
+def digest_body(body: str) -> str:
+    """El hash de un cuerpo ya aislado. Una sola normalización, un solo sitio.
+
+    Existe porque el generador del esquema portable tiene el cuerpo antes de
+    escribir el archivo, y `body_digest` lo tiene después de leerlo -- y esos
+    dos caminos dejan el salto de línea inicial en sitios distintos. Con dos
+    normalizaciones parecidas, el esquema que genera el sistema habría nacido
+    con V23 encendido: la comprobación acusando a su propio artefacto.
+    """
+    normalised = body.replace("\r\n", "\n").replace("\r", "\n").strip() + "\n"
+    return hashlib.sha256(normalised.encode("utf-8")).hexdigest()
 
 
 def read_frontmatter(path: Path) -> Optional[Tuple[Dict[str, Any], str]]:

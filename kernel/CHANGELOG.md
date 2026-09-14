@@ -37,7 +37,7 @@ idempotente. Doce subcomandos; los que cambian el día a día:
 
 - **`init`** — materializa un cerebro: estructura, esquema portable, índices y derivados. El
   starter ya no versiona un `cerebro/` con TODOs: llega vacío y esto lo construye.
-- **`validate`** — 23 comprobaciones en dos niveles (OKF / perfil), porque OKF es
+- **`validate`** — 25 comprobaciones en dos niveles (OKF / perfil), porque OKF es
   deliberadamente permisivo y un validador estricto sobre él no sería conformante.
   **`--fix`** repara lo mecánico *preservando el significado, y verificándolo*: reparsea cada
   línea de frontmatter antes de escribirla, y nunca reescribe lo que redactó una persona.
@@ -121,6 +121,61 @@ fallar. Desaparecen el `.venv`, el `requirements.txt` y el re-exec.
 - El repositorio trae `brain` (sh) y `brain.cmd` (cmd/PowerShell), que prueban `py -3`,
   `python3` y `python` en ese orden. Toda la documentación y los módulos usan `./brain`.
 - Corre también los demás scripts: `./brain kernel/bin/to-markdown.py <archivo>`.
+
+### El esquema de la proyección SQLite, generado desde el contrato
+
+- **`kernel/schema/ddl.sql`** es un artefacto generado más: lo escribe `brain generate` y **V14
+  lo vigila**, igual que a las plantillas y los JSON Schemas. Si está mal, lo que se corrige es
+  `contract.json`.
+- **`./brain project --ddl`** imprime el esquema de *este* cerebro —con sus tipos propios de
+  `cerebro/schema.json`, si los tiene— sin tocar disco.
+- Una tabla por tipo, `documentos` con los campos comunes, y **tabla hija por cada campo
+  estructurado**: `sources` y `verified` proyectan una columna por miembro en vez de un JSON
+  opaco, que es lo que permite consultarlos. Las tablas son `STRICT` y cada enum lleva su
+  `CHECK`: el motor rechaza lo que el contrato no admite.
+- **El mapa de tipos a SQL vive en el contrato**, no en el generador. Agregar un campo, o un
+  `data_type` entero, cambia el DDL sin tocar código — y el round-trip lo comprueba agregando
+  uno, además de ejecutar el DDL contra SQLite.
+- Nada de esto abre una base de datos todavía: proyectar y consultar llega después. Por eso
+  `generate` y las pruebas siguen sin importar `sqlite3`, y el DDL se verifica en CI aunque la
+  máquina no pueda alojar una base.
+
+### La clave de una iniciativa es única, y se comprueba en los tres sitios
+
+- **`proyecto` identifica a una `Iniciativa`**: es lo que todos los demás documentos escriben en
+  su propio campo `proyecto`. Dos iniciativas con el mismo slug hacen ambigua cada referencia del
+  cerebro — y **V20 no lo veía**, porque resolver encuentra una y encontrar una basta.
+- Se declara en el contrato (`key_unique`) y de ahí salen las tres aplicaciones, cada una
+  haciendo lo que solo ella puede: **`/x-nueva-iniciativa` comprueba antes de crear** —lo único
+  que lo previene, y mira también `04-archivo/`, porque reusar el slug de una iniciativa cerrada
+  rompe lo que se archivó con ella—, **V27** lo detecta en un cerebro que ya lo tiene, y el
+  **`UNIQUE`** de la proyección impide que llegue a la base.
+
+### El mapa a JSON Schema se muda al contrato
+
+- Estaba hardcodeado en el generador, que es el patrón que se rechazó al declarar el de SQL: un
+  `data_type` nuevo se habría emitido como `string` **en silencio**. Ahora los dos mapas viven en
+  `data_types` y el round-trip exige que todo tipo de dato declare los dos.
+- Los 13 JSON Schemas generados son **byte a byte idénticos** tras la migración, que es la prueba
+  de que el cambio preserva el significado en vez de suponerlo.
+
+### El `resumen` se sella contra su cuerpo (`resumen_hash` y V23)
+
+- **Un resumen desfasado es peor que no tener ninguno.** Sin resumen se abre el documento y se
+  pierde contexto; con uno que ya no describe el cuerpo, se decide **no** abrirlo creyendo algo
+  que dejó de ser cierto — y el sistema entero está construido sobre poder descartar sin abrir.
+- **`resumen_hash`** guarda el SHA-256 del **cuerpo** en el momento en que se escribió el resumen,
+  y **V23** avisa cuando el cuerpo cambió después. Es un aviso y no un error a propósito: el hash
+  no puede saber si el cambio afecta a lo que el resumen afirma —corregir una errata no lo
+  invalida—, pero sí sabe que **nadie lo ha vuelto a mirar**.
+- **`./brain hash <archivo> --body --write`** lo calcula y lo escribe. Existe porque un agente no
+  puede hacer un SHA-256 a ojo: sin el comando, el campo se rellenaría a mano y V23 vigilaría un
+  número inventado.
+- **`validate --fix` no lo toca, y es deliberado.** Recalcular el hash silenciaría el aviso sin
+  que nadie compruebe si el resumen sigue siendo cierto: falsificar la garantía en vez de
+  repararla. Sellar es una afirmación, y la hace quien acaba de escribir las dos mitades.
+- Requerido pero relajado a aviso mientras el corpus migra: los 301 documentos de producción son
+  anteriores al campo.
 
 ### Migración desde un cerebro v1
 
