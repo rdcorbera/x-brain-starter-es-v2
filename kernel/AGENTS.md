@@ -74,6 +74,7 @@ completo para deducir lo mismo, unos 10.000.
 | Ver el esquema SQL de la proyección de este cerebro | `./brain project --ddl` |
 | Sellar un `resumen` recién escrito contra su cuerpo | `./brain hash <archivo> --body --write` |
 | Proyectar el cerebro a una base consultable | `./brain project` (o `--full` para reconstruirla) |
+| Buscar por texto sin abrir documentos | `./brain project --search "<término>"` |
 
 **Un artefacto generado no se edita: se regenera.** Si algo generado está mal, lo que está mal
 es `kernel/schema/contract.json`. Editar la salida es trabajo que se pierde en la siguiente

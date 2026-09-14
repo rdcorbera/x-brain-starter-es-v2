@@ -211,6 +211,24 @@ fallar. Desaparecen el `.venv`, el `requirements.txt` y el re-exec.
 - Una fila por campo fechado, no por documento: un tipo con dos fechas aporta dos eventos, y por
   eso la vista lleva `campo`.
 
+### Búsqueda por texto: rutas y ranking, nunca contenido
+
+- **`./brain project --search "<término>"`** consulta un índice **FTS5** sobre el título, la
+  descripción, el `resumen` y el cuerpo, y ordena por **BM25**. Se puebla en la misma pasada que
+  la proyección.
+- **Devuelve rutas, ranking y título — nunca el texto encontrado.** Entregar fragmentos dejaría
+  al lector donde empezó: leyendo texto para decidir qué leer. Lo que abarata encontrar es elegir
+  bien con `description` y `resumen`, y abrir pocos.
+- **Busca sin acentos.** `migracion` encuentra `migración`: el español es el idioma por defecto de
+  un cerebro, y sin eso el índice sería una trampa para quien escribe deprisa.
+- **Si este SQLite no trae FTS5, la proyección se hace igual, sin índice, y lo dice** — nombrando
+  `sqlite-probe.py`, que es lo que responde por qué. FTS5 es un flag de compilación, no una
+  versión: un SQLite reciente puede no traerlo. Perder la búsqueda es peor que no perder nada;
+  perder la proyección entera porque falta la búsqueda sería peor aún.
+- Saltarse los vectores densos no es una concesión: la ablación del paper de Agent Zero mide esta
+  misma restricción —solo léxico pierde 1,8 puntos frente al híbrido— y las tres variantes
+  restringidas siguen por encima del mejor sistema externo.
+
 ### Migración desde un cerebro v1
 
 Los cerebros de v1 **no son conformes al perfil de v2** hasta migrarlos, pero siguen siendo

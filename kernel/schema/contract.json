@@ -660,6 +660,15 @@
       "scope_field": "proyecto",
       "view_note": "One row per dated field, not per document: a type with two date fields produces two events, which is why the view carries `campo`. Its shape -- fecha, tipo, campo, doc, title, and the scope field -- is structure rather than configuration, so it lives in the generator; what is declared here is what can change without changing code: the name, the direction, and which field scopes a query to one initiative. `order: desc` matches `log.md`, where the most recent is on top: someone reconstructing what happened reads backwards from now."
     },
+    "search": {
+      "note": "FTS5 full-text index, populated in the same pass as the projection. It returns PATHS AND RANK, never content: handing back snippets would put the reader back where cut 2 started, reading text to decide what to read. What makes finding cheap is choosing well with L0/L1 and then opening few. The permission to skip dense vectors is empirical, not a concession: the ablation in the Agent Zero paper (table 7) measures our exact restriction -- lexical-only loses 1.8 points against hybrid, grep-only 1.6, and all three restricted variants still beat the best external system.",
+      "table": "busqueda",
+      "fields": ["title", "description", "resumen"],
+      "include_body": true,
+      "tokenize": "unicode61 remove_diacritics 2",
+      "tokenize_note": "Spanish is the default language of a brain: without `remove_diacritics`, `migracion` would not find `migración` and the index would be a trap for whoever types without accents. Value 2 also folds the diacritics that carry meaning in other languages, which is the right trade here and would not be in, say, a French corpus.",
+      "degrade_note": "FTS5 is a compile flag, not a version: a perfectly recent SQLite can lack it. When it is missing the projection still runs WITHOUT the index and says so, naming `sqlite-probe.py` -- losing search is worse than losing nothing, but losing the whole projection because search is unavailable is worse still."
+    },
     "child_tables": {
       "note": "D3, option A: structured fields are normalised -- never a comma-joined string, never a JSON blob. `json1` is compiled in, but STRICT is what makes the engine reject the wrong type, and `sources`/`verified` are precisely the governance fields the competency questions ask about. Three rules and no per-name exceptions, so a new structured field grows its table without code.",
       "name_pattern": "{parent}_{field}",

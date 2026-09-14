@@ -466,16 +466,29 @@ def cmd_init(args) -> int:
 
 
 def cmd_project(args) -> int:
-    """La proyección consultable. Hoy, su esquema.
+    """La proyección consultable: su esquema, su base y su índice.
 
-    Imprime el DDL que sale del contrato de ESTE cerebro -- con sus tipos
-    propios si los tiene, porque aquí sí se mezcla `cerebro/schema.json`.
-    Aplicarlo y poblar la base es el proyector (T5), que llega después: por eso
-    este comando todavía no abre `sqlite3` ni toca disco.
+    `--ddl` imprime el esquema de ESTE cerebro —con sus tipos propios si los
+    tiene, porque aquí sí se mezcla `cerebro/schema.json`— sin tocar disco.
+    `--search` consulta el índice de texto. Sin ninguno de los dos, proyecta.
     """
     contract = Contract.load(Path(args.contract), Path(args.bundle))
     if args.ddl:
         print(render_ddl(contract), end="")
+        return 0
+
+    if args.search:
+        hits = search(contract, args.search, Path(args.db) if args.db else None)
+        if not hits:
+            print(f"brain project --search {args.search!r}: sin coincidencias.")
+            return 0
+        print(f"brain project --search {args.search!r}: {len(hits)} documento(s), "
+              f"por relevancia.")
+        for path, rank, title in hits:
+            # Ruta, ranking y título: nunca el texto encontrado. Entregar
+            # fragmentos devolvería al lector a leer para decidir qué leer,
+            # que es justo el coste que la proyección viene a quitar.
+            print(f"  {-rank:7.2f}  {path}  -- {title}")
         return 0
 
     bundle = Path(args.path)
@@ -567,6 +580,8 @@ def main() -> int:
     p.add_argument("--db", help="dónde vive la base (por defecto, la del contrato)")
     p.add_argument("--full", action="store_true",
                    help="reconstruir la base entera en vez de proyectar lo que cambió")
+    p.add_argument("--search", metavar="TÉRMINO",
+                   help="buscar en el índice de texto: devuelve rutas y ranking")
     p.set_defaults(func=cmd_project)
 
     args = parser.parse_args()

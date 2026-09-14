@@ -192,3 +192,14 @@ CREATE VIEW "eventos" AS
          t."proyecto" as "proyecto"
     from "reunion" t join "documentos" d on d."path" = t."doc"
   order by "fecha" desc;
+
+-- Devuelve rutas y ranking, nunca contenido: entregar fragmentos
+-- dejaría al lector donde empezó, leyendo texto para decidir qué leer.
+CREATE VIRTUAL TABLE "busqueda" USING fts5(
+  "path" UNINDEXED,
+  "title",
+  "description",
+  "resumen",
+  "cuerpo",
+  tokenize = 'unicode61 remove_diacritics 2'
+);

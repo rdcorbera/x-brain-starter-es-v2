@@ -45,6 +45,6 @@ from .validate import (CHECKS, Finding, Validator, apply_fixes, check_value,
                        fix_yaml_hazards, is_uninitialised, parse_instant,
                        require_bundle)
 from .report import governance_report, print_profile_proposals, report
-from .project import database_path, project, snapshot
+from .project import database_path, has_fts5, project, search, snapshot
 
 __all__ = [n for n in dir() if not n.startswith("_")]

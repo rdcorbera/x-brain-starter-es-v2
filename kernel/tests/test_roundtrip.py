@@ -617,12 +617,12 @@ def check_projection(contract) -> List[str]:
 
         db = tmp / "prueba.db"
         brain.project(local, bundle, db, full=True)
-        estado_full = brain.snapshot(db)
+        estado_full = brain.snapshot(db, local)
         if estado_full.count("\n") < len(local.types):
             problems.append("la proyección completa dejó la base casi vacía")
 
         brain.project(local, bundle, db)
-        if brain.snapshot(db) != estado_full:
+        if brain.snapshot(db, local) != estado_full:
             problems.append("una pasada incremental sin cambios alteró la base")
 
         # T6: la vista de eventos, y CQ-47 respondida con ella. Se ejecuta el
@@ -630,27 +630,91 @@ def check_projection(contract) -> List[str]:
         # corre contra el esquema, la CQ no está respondida, está redactada.
         problems += _check_timeline(local, db)
 
+        # T7: el índice de texto, en la misma pasada que la proyección.
+        problems += _check_search(local, bundle, db)
+
         objetivo = bundle / "caso-reunion.md"
         objetivo.write_text(objetivo.read_text(encoding="utf-8")
                             .replace("title: ", "title: Reescrito "), encoding="utf-8")
         brain.project(local, bundle, db)
-        tras_incremental = brain.snapshot(db)
+        tras_incremental = brain.snapshot(db, local)
         if tras_incremental == estado_full:
             problems.append("un documento modificado no llegó a la base")
         brain.project(local, bundle, db, full=True)
-        if brain.snapshot(db) != tras_incremental:
+        if brain.snapshot(db, local) != tras_incremental:
             problems.append("tras modificar, `--full` y la incremental difieren")
 
         objetivo.unlink()
         brain.project(local, bundle, db)
-        tras_borrado = brain.snapshot(db)
+        # El índice es una tabla virtual: ninguna clave foránea lo limpia. Se
+        # mira la TABLA, no el resultado de buscar: `search` hace join con
+        # `documentos`, así que un huérfano del índice nunca sale en una
+        # búsqueda -- lo cual protege a quien busca, y por eso mismo esconde
+        # que el índice esté acumulando basura. Comprobar por la búsqueda
+        # habría sido un control que no controla.
+        if brain.has_fts5():
+            import sqlite3
+            tabla = local.projection["search"]["table"]
+            aparte = sqlite3.connect(db)
+            restos = aparte.execute(
+                f'select count(*) from "{tabla}" where "path" = ?',
+                ("caso-reunion.md",)).fetchone()[0]
+            aparte.close()
+            if restos:
+                problems.append("un documento borrado sigue en el índice de texto")
+        tras_borrado = brain.snapshot(db, local)
         if "caso-reunion.md |" in tras_borrado:
             problems.append("un documento borrado dejó filas en la base")
         brain.project(local, bundle, db, full=True)
-        if brain.snapshot(db) != tras_borrado:
+        if brain.snapshot(db, local) != tras_borrado:
             problems.append("tras borrar, `--full` y la incremental difieren")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+    return problems
+
+
+def _check_search(contract, bundle, db_path) -> List[str]:
+    """El índice FTS5: encuentra, ordena por BM25 y se reconstruye sin pérdida."""
+    import sqlite3
+    cfg = contract.projection.get("search", {})
+    if not cfg.get("table"):
+        return ["el contrato no declara el índice de texto"]
+    if not brain.has_fts5():
+        print("  (este SQLite no trae FTS5: el índice de texto no se ejercitó)")
+        return []
+
+    problems = []
+    termino = "contenido"          # lo que `fill` deja en el cuerpo de cada caso
+    antes = brain.search(contract, termino, db_path, limit=50)
+    if not antes:
+        problems.append("el índice no encuentra un término que está en el cuerpo "
+                        "de todos los documentos de prueba")
+    if any(len(fila) != 3 for fila in antes):
+        problems.append("la búsqueda devuelve algo distinto de (ruta, rank, título)")
+
+    # Criterio 3: reconstruir no puede perder nada.
+    brain.project(contract, bundle, db_path, full=True)
+    despues = brain.search(contract, termino, db_path, limit=50)
+    if {f[0] for f in antes} != {f[0] for f in despues}:
+        problems.append("reconstruir el índice cambió lo que encuentra")
+
+    # Criterio 2: sin índice se falla nombrando la sonda, no con un stack trace.
+    vacia = Path(str(db_path) + ".sin-indice")
+    db = sqlite3.connect(vacia)
+    db.execute('create table "documentos" ("path" TEXT)')
+    db.close()
+    try:
+        brain.search(contract, termino, vacia)
+        problems.append("buscar sin índice no falló")
+    except SystemExit as exc:
+        if "sqlite-probe" not in str(exc):
+            problems.append("el error de «sin índice» no nombra la sonda: "
+                            "quien lo lea no sabrá qué comprobar")
+    except Exception as exc:                                   # noqa: BLE001
+        problems.append(f"buscar sin índice lanzó {type(exc).__name__}, "
+                        f"no un error explicado: {exc}")
+    finally:
+        vacia.unlink(missing_ok=True)
     return problems
 
 

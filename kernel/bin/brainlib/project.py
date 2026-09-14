@@ -23,7 +23,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from .const import DEFAULT_BUNDLE
 from .parse import Contract, Document
-from .generate import projection_plan, render_ddl
+from .generate import projection_plan, render_ddl, search_columns, split_document
 
 
 def database_path(contract: Contract) -> Path:
@@ -91,8 +91,14 @@ def project(contract: Contract, bundle: Path, db_path: Optional[Path] = None,
     db = connect(db_path)
     fresh = not db.execute(
         "select count(*) from sqlite_master where type='table'").fetchone()[0]
+    indexable = True
     if fresh:
-        db.executescript(render_ddl(contract))
+        indexable = _apply_ddl(db, contract)
+    else:
+        indexable = bool(db.execute(
+            "select count(*) from sqlite_master where name = ?",
+            (contract.projection.get("search", {}).get("table"),)).fetchone()[0])
+    columns = search_columns(contract) if indexable else []
 
     known: Dict[str, str] = {}
     if not fresh:
@@ -114,17 +120,102 @@ def project(contract: Contract, bundle: Path, db_path: Optional[Path] = None,
             stats["sin cambios"] += 1
             continue
         _write_document(db, plan, doc, digest)
+        if columns:
+            _index_document(db, contract, doc, columns)
         stats["escritos"] += 1
 
     for rel in sorted(set(known) - seen):
         # ON DELETE CASCADE se lleva las filas de tipo y las hijas.
         db.execute(f'delete from "{docs_table["table"]}" '
                    f'where "{docs_table["key"]}" = ?', (rel,))
+        if columns:
+            # El índice es una tabla virtual: ninguna clave foránea lo limpia,
+            # así que si no se borra aquí, un documento retirado seguiría
+            # apareciendo en las búsquedas.
+            db.execute(f'delete from "{contract.projection["search"]["table"]}" '
+                       f'where "{columns[0]}" = ?', (rel,))
         stats["retirados"] += 1
 
+    if not indexable:
+        stats["sin índice"] = 1
     db.commit()
     db.close()
     return stats
+
+
+def has_fts5() -> bool:
+    """¿Trae FTS5 este SQLite? Es un flag de compilación, no una versión.
+
+    Un SQLite perfectamente reciente puede no traerlo, así que preguntarle a la
+    versión no sirve: se comprueba intentándolo, que es lo mismo que hace
+    `sqlite-probe.py` y por lo mismo.
+    """
+    try:
+        db = sqlite3.connect(":memory:")
+        db.execute("create virtual table t using fts5(x)")
+        db.close()
+        return True
+    except sqlite3.Error:
+        return False
+
+
+def _apply_ddl(db: sqlite3.Connection, contract: Contract) -> bool:
+    """Crea el esquema. Devuelve si el índice de texto quedó disponible."""
+    ddl = render_ddl(contract)
+    if has_fts5():
+        db.executescript(ddl)
+        return True
+    # Sin FTS5 se proyecta igual, sin índice, y se dice en voz alta: perder la
+    # búsqueda es peor que no perder nada, y perder la proyección entera por
+    # ella es peor todavía.
+    sentencias = [s for s in ddl.split(";") if "VIRTUAL TABLE" not in s.upper()]
+    db.executescript(";".join(sentencias) + ";")
+    return False
+
+
+def _index_document(db: sqlite3.Connection, contract: Contract, doc: Document,
+                    columns: List[str]) -> None:
+    """Una fila del índice de texto: los tres niveles de lectura y el cuerpo."""
+    table = contract.projection["search"]["table"]
+    db.execute(f'delete from "{table}" where "{columns[0]}" = ?', (doc.rel,))
+    values = [doc.rel]
+    for column in columns[1:]:
+        if column == "cuerpo":
+            values.append(split_document(doc.text)[1])
+        else:
+            values.append(str(doc.meta.get(column) or ""))
+    marks = ", ".join("?" * len(columns))
+    names = ", ".join(f'"{c}"' for c in columns)
+    db.execute(f'insert into "{table}" ({names}) values ({marks})', values)
+
+
+def search(contract: Contract, query: str, db_path: Optional[Path] = None,
+           limit: int = 10) -> List[Tuple[str, float, str]]:
+    """Buscar. Devuelve (ruta, rank, título) -- nunca el texto encontrado."""
+    db_path = Path(db_path) if db_path else database_path(contract)
+    table = contract.projection.get("search", {}).get("table")
+    if not db_path.exists():
+        raise SystemExit(f"error: no hay proyección en `{db_path}`.\n"
+                         "       Créala con `brain project`.")
+    db = connect(db_path)
+    existe = db.execute("select count(*) from sqlite_master where name = ?",
+                        (table,)).fetchone()[0]
+    if not existe:
+        db.close()
+        raise SystemExit(
+            "error: esta proyección no tiene índice de texto.\n"
+            "       Este SQLite no trae FTS5 compilado -- no es cuestión de versión,\n"
+            "       es un flag de compilación. Compruébalo con:\n"
+            "         ./brain kernel/bin/sqlite-probe.py <ruta>\n"
+            "       El resto de la proyección funciona: `brain project` sin `--search`.")
+    key = search_columns(contract)[0]
+    rows = db.execute(
+        f'select f."{key}", bm25("{table}"), d."title" from "{table}" f '
+        f'join "documentos" d on d."path" = f."{key}" '
+        f'where "{table}" match ? order by bm25("{table}") limit ?',
+        (query, limit)).fetchall()
+    db.close()
+    return rows
 
 
 def _projectable(contract: Contract, doc: Document, tables: set) -> bool:
@@ -197,7 +288,7 @@ def _insert(db: sqlite3.Connection, table: str, columns: List[str],
     db.execute(f'insert into "{table}" ({names}) values ({marks})', values)
 
 
-def snapshot(db_path: Path) -> str:
+def snapshot(db_path: Path, contract: Optional[Contract] = None) -> str:
     """El contenido lógico de la base, en texto ordenado y estable.
 
     Comparar dos archivos `.db` byte a byte no sirve: SQLite reutiliza páginas
@@ -206,8 +297,17 @@ def snapshot(db_path: Path) -> str:
     """
     db = connect(db_path)
     out: List[str] = []
+    # Las tablas sombra del índice (`<fts>_data`, `_idx`, `_docsize`…) guardan
+    # su estructura interna en blobs: reconstruir el índice puede dejarlos
+    # distintos aunque las búsquedas den lo mismo. Compararlos haría fallar el
+    # criterio de T5 por una diferencia que no significa nada. La tabla virtual
+    # SÍ se vuelca, que es donde está su contenido.
+    fts = (contract.projection.get("search", {}).get("table", "")
+           if contract else "")
     for (table,) in db.execute("select name from sqlite_master where type='table' "
                                "order by name"):
+        if fts and table.startswith(fts + "_"):
+            continue
         columns = [r[1] for r in db.execute(f'pragma table_info("{table}")')]
         order = ", ".join(f'"{c}"' for c in columns)
         out.append(f"# {table}({', '.join(columns)})")

@@ -470,7 +470,47 @@ def render_ddl(contract: Contract) -> str:
     if vista:
         out.append(vista)
         out.append("")
+    indice = render_search_index(contract)
+    if indice:
+        out.append(indice)
+        out.append("")
     return "\n".join(out).rstrip() + "\n"
+
+
+def search_columns(contract: Contract) -> List[str]:
+    """Las columnas del índice de texto, en orden. La ruta va primero y sin indexar."""
+    cfg = contract.projection.get("search", {})
+    if not cfg.get("table"):
+        return []
+    docs = contract.projection.get("documents_table", "documentos")
+    columns = [_primary_key(contract, docs)] + list(cfg.get("fields", []))
+    if cfg.get("include_body"):
+        columns.append("cuerpo")
+    return columns
+
+
+def render_search_index(contract: Contract) -> str:
+    """La tabla virtual FTS5. Se emite siempre; aplicarla es otra cosa.
+
+    El DDL es el esquema canónico y no depende de con qué SQLite se lea. Que
+    una máquina concreta no traiga FTS5 compilado lo resuelve el proyector, que
+    omite esta sentencia y lo dice -- perder la búsqueda es peor que no perder
+    nada, y perder la proyección entera porque falta la búsqueda es peor aún.
+    """
+    cfg = contract.projection.get("search", {})
+    columns = search_columns(contract)
+    if not columns:
+        return ""
+    docs = contract.projection.get("documents_table", "documentos")
+    key = _primary_key(contract, docs)
+    partes = [f"{_sql_ident(c)}" + (" UNINDEXED" if c == key else "") for c in columns]
+    tokenize = cfg.get("tokenize")
+    if tokenize:
+        partes.append(f"tokenize = '{tokenize}'")
+    cuerpo = ",\n".join(f"  {p}" for p in partes)
+    return ("-- Devuelve rutas y ranking, nunca contenido: entregar fragmentos\n"
+            "-- dejaría al lector donde empezó, leyendo texto para decidir qué leer.\n"
+            f"CREATE VIRTUAL TABLE {_sql_ident(cfg['table'])} USING fts5(\n{cuerpo}\n);")
 
 
 def timeline_fields(contract: Contract) -> List[Tuple[str, str]]:
