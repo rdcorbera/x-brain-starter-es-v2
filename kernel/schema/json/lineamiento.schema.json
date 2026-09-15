@@ -98,7 +98,7 @@
     "estado": {
       "type": "string",
       "enum": [
-        "vigente",
+        "aprobado",
         "en-revision"
       ]
     },

@@ -56,6 +56,10 @@ questions:
       necesidad observada. Byström & Järvelin 1995: personas/responsables como
       fuente crece con la complejidad de la tarea.
     cost_today: "reconstruir el estado abierto de memoria o releyendo hilos; coste de reanudación ~25 min por ítem interrumpido (Mark et al. 2005)"
+    sql: >-
+      select d.title, q.responsable, q.proyecto from pregunta q
+      join documentos d on d.path = q.doc
+      where q.estado = 'abierta' and q.bloqueante = 1 order by q.proyecto
 
   - id: CQ-22
     question: "¿Qué preguntas llevan más de N días abiertas sin avance?"
@@ -75,6 +79,11 @@ questions:
     note: >-
       v1 dispersa los umbrales en prosa (2, 7 y 14 días en cuatro sitios).
       Deben venir de un solo lugar.
+    sql: >-
+      select d.title, q.fecha_creacion from pregunta q
+      join documentos d on d.path = q.doc
+      where q.estado = 'abierta'
+      and julianday(:hoy) - julianday(q.fecha_creacion) > :dias
 
   - id: CQ-35
     question: "¿Qué preguntas abiertas no tienen responsable asignado?"
@@ -88,6 +97,10 @@ questions:
     grows_with_n: true
     evidence: "Mark et al. 2005: los ítems sin dueño se pierden en la fragmentación. Wegner 1987: sin ubicación asignada no hay recuperación."
     cost_today: "no hay señal; el ítem sin dueño desaparece"
+    sql: >-
+      select d.title, q.proyecto from pregunta q
+      join documentos d on d.path = q.doc
+      where q.estado = 'abierta' and (q.responsable is null or trim(q.responsable) = '')
 
   # -- confianza en el propio corpus (campos comunes, no tipos) ---------------
 
@@ -104,6 +117,11 @@ questions:
     evidence: "LongMemEval (Wu et al. 2024): la abstención como capacidad evaluada. FACTUM (arXiv 2601.05866): riesgo de tratar como fiable lo no verificado."
     cost_today: "hoy es imposible distinguir a ojo qué escribió un agente; se asume verdad todo"
     justifies: "campos comunes generated/verified -- no un tipo"
+    sql: >-
+      select d.path, d.type, d.title, d.generated_by from documentos d
+      where d.generated_by not like 'human:%'
+      and not exists (select 1 from documentos_verified v
+      where v.doc = d.path and v.by like 'human:%')
 
   - id: CQ-24
     question: "¿Qué documentos pasaron su fecha de caducidad y siguen marcados como vigentes?"
@@ -123,6 +141,10 @@ questions:
       checks de juicio de /x-curar. Corregido en la entrada: el valor de `status`
       es `stable`, no `vigente` -- `vigente` pertenece a Lineamiento.estado
       (llamado `vigencia` hasta la decisión D-4 del 2026-09-10).
+    sql: >-
+      select d.path, d.title, d.stale_after from documentos d
+      where d.status = 'stable' and d.stale_after is not null
+      and d.stale_after < :ahora
 
   - id: CQ-37
     question: "¿Qué documentos de nivel confidencial o restringido tocan a este proyecto?"
@@ -141,6 +163,10 @@ questions:
       `proyecto` NO es campo común: lo declaran 8 de los 13 tipos. La CQ filtra
       por él donde exista, y por eso no aparece en `fields`. Corregido en la
       entrada, donde figuraba como si fuera común.
+    sql: >-
+      select d.path, d.type, d.title, d.classification from documentos d
+      join documento_proyecto p on p.doc = d.path
+      where d.classification in ('confidential', 'restricted') and p.proyecto = :proyecto
 
   # -- decisiones: vigencia, supersesión, procedencia, autoría ----------------
 
@@ -157,6 +183,12 @@ questions:
     evidence: "Hertzum & Pejtersen 2000: el porqué de la decisión no está en la documentación técnica, por eso se recurre a personas. Controlling Authority Retrieval: la vigencia es la clave, no la relevancia."
     cost_today: "buscar en hilos y actas cuál fue la última decisión y si sigue en pie"
     note: "Corregido en la entrada: el valor de Decision.estado es `aceptada`, no `vigente`."
+    sql: >-
+      select d.title, dec.fecha, s.resource from decision dec
+      join documentos d on d.path = dec.doc
+      left join documentos_sources s on s.doc = d.path
+      where dec.proyecto = :proyecto and dec.estado = 'aceptada'
+      and dec.valido_hasta is null
 
   - id: CQ-28
     question: "¿Qué decisiones del proyecto X fueron reemplazadas, por cuál y cuándo?"
@@ -170,6 +202,11 @@ questions:
     grows_with_n: true
     evidence: "Controlling Authority Retrieval (arXiv 2604.14488): supersesión explícita. LongMemEval (Wu et al. 2024): knowledge-update como categoría."
     cost_today: "no hay cadena de supersesión; se dan por vivas decisiones muertas"
+    sql: >-
+      select d.title, dec.valido_hasta, dec.reemplazada_por from decision dec
+      join documentos d on d.path = dec.doc
+      where dec.proyecto = :proyecto and dec.valido_hasta is not null
+      and dec.reemplazada_por is not null order by dec.valido_hasta
 
   - id: CQ-40
     question: "¿Qué decisiones registré yo (o un actor concreto) en este periodo?"
@@ -186,6 +223,11 @@ questions:
     note: >-
       Corregido en la entrada: `periodo` no es campo de Decision (es de
       Iniciativa). El periodo es un rango sobre `fecha`.
+    sql: >-
+      select d.title, dec.fecha from decision dec
+      join documentos d on d.path = dec.doc
+      join decision_decisores dd on dd.doc = dec.doc
+      where dd.value = :persona and dec.fecha between :desde and :hasta
 
   - id: CQ-34
     question: "¿Qué decisiones, iniciativas y análisis hay registrados sobre este tema en periodos anteriores?"
@@ -208,6 +250,12 @@ questions:
       nuevo buscándose una pregunta: es que ESTA pregunta ya se respondía con
       análisis archivados, y hasta ahora venían tipados como Playbook. Sin esto,
       el tipo escindido nacería huérfano y la regla de corte lo dejaría fuera.
+    sql: >-
+      select d.type, d.title, i.periodo from documentos d
+      join documento_proyecto p on p.doc = d.path
+      join iniciativa i on i.proyecto = p.proyecto
+      where p.proyecto = :proyecto and i.periodo < :periodo
+      and d.type in ('Decision', 'Iniciativa', 'Analisis')
 
   # -- iniciativas, planes y dependencias ------------------------------------
 
@@ -223,6 +271,12 @@ questions:
     grows_with_n: true
     evidence: "Mark et al. 2005: los gestores mantienen varias working spheres simultáneas. Byström & Järvelin 1995: el estado de la tarea como necesidad recurrente."
     cost_today: "consolidar el estado de varias iniciativas de memoria o pidiéndolo por chat"
+    sql: >-
+      select d.title, i.estado,
+      (select count(*) from pregunta q
+      where q.proyecto = i.proyecto and q.estado = 'abierta' and q.bloqueante = 1)
+      as bloqueantes
+      from iniciativa i join documentos d on d.path = i.doc where i.periodo = :periodo
 
   - id: CQ-36
     question: "¿Qué planes tengo cuya última revisión es más antigua que su cadencia esperada?"
@@ -237,6 +291,10 @@ questions:
     evidence: "Controlling Authority Retrieval: la frescura como condición de autoridad. Barreau & Nardi 1995: distinción entre lo working y lo archivado."
     cost_today: "no se sabe si el plan está desactualizado hasta que falla"   # inferred
     note: "Única CQ que sostiene el tipo Plan, y lo sostiene débilmente. Ver type_verdicts."
+    sql: >-
+      select d.title, pl.ultima_revision, pl.fuente_de_verdad from plan pl
+      join documentos d on d.path = pl.doc
+      where julianday(:hoy) - julianday(pl.ultima_revision) > :umbral
 
   - id: CQ-42
     question: "¿Qué iniciativas dependen de este sistema o de esta persona?"
@@ -250,6 +308,14 @@ questions:
     grows_with_n: true
     evidence: "Change-impact analysis (arXiv 1703.01897): rastreo de dependencias e interlocutores. Wegner 1987: riesgo de perder al dueño del conocimiento."
     cost_today: "análisis de impacto manual e incompleto"
+    sql: >-
+      select d.title, 'sistema' as via from iniciativa i
+      join documentos d on d.path = i.doc
+      join iniciativa_sistemas s on s.doc = i.doc where s.value = :sistema
+      union all
+      select d.title, 'persona' as via from iniciativa i
+      join documentos d on d.path = i.doc
+      join iniciativa_personas pe on pe.doc = i.doc where pe.value = :persona
 
   # -- personas: memoria transactiva -----------------------------------------
 
@@ -265,6 +331,10 @@ questions:
     grows_with_n: true
     evidence: "Wegner 1987 (memoria transactiva, «who knows what»). Hertzum & Pejtersen 2000: se busca a la persona que puede explicar o desbloquear."
     cost_today: "se reconstruye de memoria justo antes de la reunión; se olvida cobrar cosas"
+    sql: >-
+      select d.title, q.proyecto, q.fecha_creacion from pregunta q
+      join documentos d on d.path = q.doc
+      where q.responsable = :persona and q.estado = 'abierta'
 
   - id: CQ-31
     question: "¿Quién reporta a quién y qué huecos tiene el organigrama que conozco?"
@@ -278,6 +348,12 @@ questions:
     grows_with_n: true
     evidence: "Wegner 1987: directorio de expertise. Hertzum & Pejtersen 2000: localizar a la persona correcta."
     cost_today: "preguntar a colegas quién manda en qué; conocimiento tácito"
+    sql: >-
+      select d.title, pe.rol, pe.equipo, pe.reporta_a,
+      case when pe.reporta_a is null or pe.rol is null then 'hueco' else 'completo' end
+      as ficha
+      from persona pe join documentos d on d.path = pe.doc
+      order by ficha, coalesce(pe.reporta_a, '')
 
   - id: CQ-41
     question: "¿Qué preguntas respondió esta persona y en qué documentos quedó la respuesta?"
@@ -292,6 +368,10 @@ questions:
     evidence: "Wegner 1987: metamemoria de quién respondió qué. Hertzum 2002: atribución correcta de la fuente."
     cost_today: "recordar quién contestó qué; se pierde la atribución"
     note: "Corregido en la entrada: Pregunta no tiene `fecha`, tiene `fecha-creacion`."
+    sql: >-
+      select d.title, q.respondida_por from pregunta q
+      join documentos d on d.path = q.doc
+      where q.respondida_por = :persona and q.estado = 'respondida'
 
   - id: CQ-39
     question: "¿Qué sistemas son propiedad de esta persona o equipo?"
@@ -305,6 +385,10 @@ questions:
     grows_with_n: true
     evidence: "Wegner 1987: directorio de «who owns what». Hertzum & Pejtersen 2000: localizar al dueño para desbloquear."
     cost_today: "preguntar por chat de quién es tal sistema"
+    sql: >-
+      select d.title, s.categoria, s.estado from sistema s
+      join documentos d on d.path = s.doc
+      where s."dueño" = :persona or s."dueño" = :equipo
 
   # -- reconstrucción de contexto: tiempo y entidades -------------------------
 
@@ -320,6 +404,15 @@ questions:
     grows_with_n: true
     evidence: "Dumais et al. 2003 (Stuff I've Seen): personas y tiempo son las claves de recuperación dominantes. Teevan et al. 2007: «40% of all queries are re-finding queries»."
     cost_today: "buscar por texto libre a través de muchos documentos, de forma incompleta"
+    sql: >-
+      select d.type, d.title, 'asistente' as rol from reunion_asistentes r
+      join documentos d on d.path = r.doc where r.value = :persona
+      union all select d.type, d.title, 'decisor' from decision_decisores dd
+      join documentos d on d.path = dd.doc where dd.value = :persona
+      union all select d.type, d.title, 'implicada' from iniciativa_personas ip
+      join documentos d on d.path = ip.doc where ip.value = :persona
+      union all select d.type, d.title, 'sistema' from iniciativa_sistemas isx
+      join documentos d on d.path = isx.doc where isx.value = :sistema
 
   - id: CQ-33
     question: "¿Qué reuniones tuve con esta persona o sobre este proyecto y en qué fechas?"
@@ -333,6 +426,12 @@ questions:
     grows_with_n: true
     evidence: "Barreau & Nardi 1995: recuperación por localización y tiempo. Dumais et al. 2003: el tiempo como landmark de recuperación."
     cost_today: "buscar en el calendario y en notas dispersas"
+    sql: >-
+      select d.title, r.fecha from reunion r
+      join documentos d on d.path = r.doc
+      left join reunion_asistentes a on a.doc = r.doc
+      where r.proyecto = :proyecto or a.value = :persona
+      group by d.path order by r.fecha desc
 
   # -- norma, artefactos y procedencia ---------------------------------------
 
@@ -348,6 +447,11 @@ questions:
     grows_with_n: true
     evidence: "Controlling Authority Retrieval: la autoridad la gobierna la vigencia. NARA/IRS: obligación de operar sobre la versión vigente."
     cost_today: "buscar el lineamiento aplicable y verificar que sigue vigente"
+    sql: >-
+      select d.title, l.area, l.fuente from lineamiento l
+      join documentos d on d.path = l.doc
+      where l.area = :area and l.estado = 'aprobado'
+      and (l.valido_hasta is null or l.valido_hasta > :hoy)
 
   - id: CQ-29
     question: "¿Qué decisiones afectan a este sistema y cuáles siguen vigentes?"
@@ -362,6 +466,11 @@ questions:
     evidence: "Hertzum 2002: los ingenieros rastrean decisiones sobre artefactos. Change-impact (arXiv 1703.01897): se usan los enlaces para identificar decisiones e interlocutores."
     cost_today: "reconstruir qué se decidió sobre un sistema a lo largo del tiempo"
     note: "Corregido en la entrada: `estado=vigente` no existe ni en Decision ni en Sistema."
+    sql: >-
+      select d.title, dec.estado, dec.valido_hasta from decision dec
+      join documentos d on d.path = dec.doc
+      where dec.estado = 'aceptada' and dec.valido_hasta is null
+      and dec.doc in (select path from busqueda where busqueda match :termino)
 
   - id: CQ-38
     question: "¿Qué diagramas existen de este proyecto y cuál es su versión más reciente por clase?"
@@ -376,6 +485,9 @@ questions:
     evidence: "Hertzum & Pejtersen 2000: los artefactos de diseño se consultan para reconstruir el porqué. Sostiene la existencia consultiva de Diagrama, aunque débilmente."
     cost_today: "buscar la última versión del diagrama entre varias copias"   # inferred
     note: "Única CQ que sostiene el tipo Diagrama. Ver type_verdicts."
+    sql: >-
+      select dg.clase, max(dg.version) as version from diagrama dg
+      where dg.proyecto = :proyecto group by dg.clase
 
   - id: CQ-43
     question: "¿Qué insumos archivados sustentan esta iniciativa o decisión y cuál es su origen?"
@@ -390,6 +502,9 @@ questions:
     evidence: "NARA/IRS: manifiesto de originales y procedencia. Controlling Authority Retrieval: trazar la fuente."
     cost_today: "buscar el original que respalda una afirmación en auditoría"
     note: "Única pregunta que roza a Insumo, y es de procedencia, no de contenido. Ver type_verdicts."
+    sql: >-
+      select d.title, i.origen, i.formato from insumo i
+      join documentos d on d.path = i.doc where i.proyecto = :proyecto
 
   - id: CQ-44
     question: "¿Qué playbooks (procesos reutilizables) existen para este tipo de tarea o proyecto?"
@@ -407,6 +522,11 @@ questions:
       Separa el uso «proceso reutilizable» del uso «análisis archivado» de
       Playbook, que queda en CQ-34. Corregido en la entrada: el valor de
       `status` es `stable`. Ver type_verdicts: el tipo debe escindirse.
+    sql: >-
+      select distinct d.title from playbook pb
+      join documentos d on d.path = pb.doc
+      left join documentos_tags t on t.doc = d.path
+      where d.status = 'stable' and (pb.proyecto = :proyecto or t.value = :tema)
 
 
   # == Bloque Agent Zero (2026-09-10) =========================================
@@ -446,6 +566,12 @@ questions:
       prosa y pasa a ser una interfaz, y una interfaz sin comprobación es lo que
       este sistema existe para eliminar. Solo se proyectan los CONTEOS: el texto
       de la pregunta no entra en la base.
+    sql: >-
+      select count(*) as consultas,
+      sum(case when completos = 0 then 1 else 0 end) as sin_abrir,
+      round(sum(case when completos = 0 then 1.0 else 0.0 end)
+      / nullif(count(*), 0), 2) as proporcion
+      from consultas
 
   - id: CQ-46
     question: "¿Cuántos documentos abre una consulta típica, y cuántos de ellos completos?"
@@ -487,6 +613,12 @@ questions:
       forma sistemática, o el resumen no permite descartar (se arregla cómo se
       redacta) o el agente abre por inercia (se arregla la regla del módulo).
       Se proyecta igual que CQ-45; ver su nota.
+    sql: >-
+      select round(avg(docs), 1) as docs_vistos,
+      round(avg(completos), 1) as abiertos_enteros,
+      round(avg(citados), 1) as citados,
+      round(sum(citados) * 1.0 / nullif(sum(completos), 0), 2) as aprovechamiento
+      from consultas
 
   # -- la línea de tiempo: cuándo cambió qué -----------------------------------
 
@@ -621,6 +753,10 @@ questions:
       La ablación de Zhu & Wu (Tabla 7) mide el techo de este canal sin
       vectores densos: léxico solo cuesta 1,8 puntos frente al híbrido, y aun
       así supera a todos los sistemas externos comparados.
+    sql: >-
+      select b.path, d.type, d.title, bm25(busqueda) as relevancia
+      from busqueda b join documentos d on d.path = b.path
+      where busqueda match :termino order by relevancia limit 20
 
   # -- cierre de ciclo ---------------------------------------------------------
 
@@ -649,6 +785,12 @@ questions:
       CQ-42, CQ-26, CQ-41 y CQ-39, hay un tipo listado que no aporta ninguno de
       los tres campos -- aquí Lineamiento: está por ser destino de promoción,
       no por aportar columnas.
+    sql: >-
+      select d.type, d.title, i.periodo from documentos d
+      join documento_proyecto p on p.doc = d.path
+      join iniciativa i on i.proyecto = p.proyecto
+      where i.estado = 'entregada'
+      and d.type in ('Analisis', 'Decision', 'Lineamiento', 'Playbook')
 
   # -- procedencia: cómo entró cada cosa ---------------------------------------
 
@@ -682,11 +824,35 @@ questions:
       `Iniciativa.origen` es un enum y `Insumo.origen` un enlace a /raw/--, y
       `derived_files.GOALS.md` agrupa por él. `procedencia` no colisiona con
       nada y es el término del paper.
+    sql: >-
+      select procedencia, count(*) as documentos,
+      sum(case when exists (select 1 from documentos_verified v
+      where v.doc = documentos.path and v.by like 'human:%')
+      then 1 else 0 end) as verificados_por_persona
+      from documentos group by procedencia order by documentos desc
 
 # Adversarial questions: things the system must NOT be able to answer wrongly.
 # Tested like the rest, but they pass when the system refuses or warns, not
 # when it answers. ADV-01..04 are inherited from the draft and carry no
 # literature backing; ADV-05..12 come from documented failure modes.
+
+# ADV-13 y ADV-14 no describen un estado de los datos, sino una conducta de quien
+# responde: «solo se cita lo que se abrió» y «una inferencia no se presenta con el
+# peso de una lectura». Ninguna consulta puede verlas -- la primera la sostienen V22
+# y la sesión, la segunda `procedencia` y la regla de T11. Exentas por naturaleza, no
+# por pereza, y declaradas aquí para que el test de T8 no tenga que saberlo de memoria.
+sql_exempt: [ADV-01, ADV-02, ADV-13, ADV-14]
+# ADV-01 y ADV-02 se escribieron primero como consultas sobre la vista `vigencia`
+# y resultaron VACUAS: preguntaban si el CASE se contradice a sí mismo, y un CASE
+# generado no puede. Lo que prohíben —presentar como vigente algo que caducó, o
+# como acordado algo reemplazado, «sin decirlo»— es conducta de quien responde, no
+# un estado de los datos. Su mitad estructural está garantizada por construcción:
+# la vista `vigencia` no deja obtener la lista sin la columna que dice el estado
+# derivado, así que el dato para advertir siempre está delante. Exentas por la misma
+# razón que ADV-13 y ADV-14, y no por no encontrarles una consulta.
+#
+# Lo que SÍ salió de escribirlas: `Lineamiento.estado` tenía el valor `vigente`,
+# que afirmaba una vigencia que ese campo ya no decide. Renombrado a `aprobado`.
 
 adversarial:
 
@@ -707,6 +873,11 @@ adversarial:
     must_not: "inferir la jerarquía de un correo, un organigrama parcial o el contexto"
     harm: "jerarquía inventada; se escala al interlocutor equivocado"
     evidence: "heredada del borrador. Reforzada por ADV-11."
+    sql: >-
+      select pe.doc, pe.reporta_a from persona pe
+      where pe.reporta_a is not null and trim(pe.reporta_a) <> ''
+      and not exists (select 1 from documentos d
+      where '/' || d.path = pe.reporta_a or d.path = pe.reporta_a)
 
   - id: ADV-04
     question: "¿Cuál es el estado de este proyecto?"
@@ -715,6 +886,9 @@ adversarial:
       que el dato puede estar obsoleto
     harm: "decisión tomada sobre datos caducados"
     evidence: "heredada del borrador. Reforzada por ADV-10."
+    sql: >-
+      select path, title, stale_after from documentos
+      where status = 'stable' and stale_after is not null and stale_after < :ahora
 
   - id: ADV-05
     question: "¿Me pasas los datos de compensación / el documento restringido del proyecto X?"
@@ -725,12 +899,20 @@ adversarial:
       exposición no intencionada entre roles es inevitable sin control por
       participante. Material de proveedores de seguridad [calidad baja]: solo
       nombra el modo de fallo, no su prevalencia.
+    sql: >-
+      select path, type, classification from documentos
+      where type in ('Persona', 'Insumo') and classification not in ('confidential', 'restricted')
 
   - id: ADV-06
     question: "¿Quién decidió cerrar la iniciativa X?"
     must_not: "atribuir la decisión a una persona que no figura en el campo decisores; inventar o inferir el decisor"
     harm: "se responsabiliza a quien no decidió, dañando relaciones y rendición de cuentas"
     evidence: "FACTUM (arXiv 2601.05866): «misattribution of information to an incorrect or fabricated source». Hertzum & Pejtersen 2000: el quién y el porqué no están documentados y se infieren mal."
+    sql: >-
+      select dd.doc, dd.value from decision_decisores dd
+      where not exists (select 1 from documentos d
+      where ('/' || d.path = dd.value or d.path = dd.value)
+      and d.type = 'Persona')
 
   - id: ADV-07
     question: "¿Ya acordamos usar el proveedor Y?"
@@ -738,36 +920,56 @@ adversarial:
     harm: "se actúa sobre un compromiso inexistente, con coste contractual y de reputación"
     evidence: "LoCoMo (Maharana et al. 2024): 446 preguntas adversariales sobre inferencia no soportada. Evidence override en RAG (arXiv 2604.09174)."
     note: "Corregido en la entrada: el estado que significa «acordado» es `aceptada`, no `vigente`."
+    sql: >-
+      select d.title, dec.estado from decision dec
+      join documentos d on d.path = dec.doc
+      where dec.estado = 'propuesta'
+      and (dec.valido_hasta is not null or dec.reemplazada_por is not null)
 
   - id: ADV-08
     question: "¿Cuál es la política vigente sobre Z?"
     must_not: "responder desde un Lineamiento cuyo valido_hasta ya pasó, o que fue reemplazado, sin advertir el estado"
     harm: "lineamiento derogado presentado como vigente"
     evidence: "Controlling Authority Retrieval (arXiv 2604.14488): «standard retrieval systems fail on it structurally»; RAG «silent on supersession». NARA/GRS."
+    sql: >-
+      select tipo, title, doc from vigencia
+      where reemplazada_por is not null and valido_hasta is null
 
   - id: ADV-09
     question: "¿Qué sabemos del proyecto X? (resumen general)"
     must_not: "sintetizar como hechos verificados contenido generado por un agente y no confirmado (generated sin verified)"
     harm: "prosa generada por IA presentada como conocimiento verificado; se propaga error no revisado como verdad institucional"
     evidence: "LongMemEval (Wu et al. 2024): abstención como capacidad. «Inference stated as fact» = 17,54% de spans de alucinación añadidos (arXiv 2603.27752)."
+    sql: >-
+      select v.doc, v.by from documentos_verified v where v.by not like 'human:%'
 
   - id: ADV-10
     question: "¿Este documento sigue siendo válido para basar mi decisión?"
     must_not: "responder afirmativamente desde un documento con stale_after vencido sin marcar la caducidad"
     harm: "información caducada presentada como vigente"
     evidence: "Controlling Authority Retrieval (arXiv 2604.14488). K-FinHallu (arXiv 2605.29523): «outdated reference documents» como categoría real de error en despliegue."
+    sql: >-
+      select path, title, stale_after, status from documentos
+      where stale_after is not null and stale_after < :ahora and status <> 'deprecated'
 
   - id: ADV-11
     question: "¿Cuál es la jerarquía / quién manda entre A y B?"
     must_not: "inferir una relación reporta-a que no está declarada en el campo"
     harm: "se asume una autoridad inexistente"
     evidence: "Wegner 1987: el directorio de «who knows what» debe ser explícito. Evidence override (arXiv 2604.09174): relleno de huecos con inferencia no soportada."
+    sql: >-
+      select a.doc as persona_a, b.doc as persona_b from persona a
+      join persona b on ('/' || b.doc = a.reporta_a or b.doc = a.reporta_a)
+      where ('/' || a.doc = b.reporta_a or a.doc = b.reporta_a)
 
   - id: ADV-12
     question: "Dame la fuente de esta decisión."
     must_not: "devolver una decisión sin su campo sources, o fabricar una referencia de fuente"
     harm: "decisión sin procedencia trazable; en auditoría o disputa no se puede sostener"
     evidence: "Provenance-aware research artifacts (arXiv 2604.16208): la pérdida de procedencia equivale a decaimiento del conocimiento. FACTUM (arXiv 2601.05866)."
+    sql: >-
+      select s.doc, s.resource from documentos_sources s
+      where s.resource is null or trim(s.resource) = ''
 
 
   - id: ADV-13

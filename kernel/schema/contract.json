@@ -463,8 +463,8 @@
       "fields": {
         "area":     { "data_type": "text", "required": true, "placeholder": "nombre del área en /02-areas/" },
         "fuente":   { "data_type": "person-ref", "required": true, "steward": true, "placeholder": "quién lo definió — enlace a ficha, comité o área", "note": "who defined it. Accepts a committee or an area as free text; V17 reports it until it points at a ficha." },
-        "estado":          { "data_type": "enum", "values": ["vigente", "en-revision"], "default": "vigente", "required": true,
-                             "note": "Renamed from `vigencia` in T9 -- it did the same job as `estado` elsewhere under another name, and the compatibility that justified keeping it was retired. `derogado` left the enum: a repealed guideline is one with a `valido_hasta` in the past, which also says WHEN it stopped applying, something the enum never could." },
+        "estado":          { "data_type": "enum", "values": ["aprobado", "en-revision"], "default": "aprobado", "required": true,
+                             "note": "Renamed from `vigencia` in T9 -- it did the same job as `estado` elsewhere under another name, and the compatibility that justified keeping it was retired. `derogado` left the enum: a repealed guideline is one with a `valido_hasta` in the past, which also says WHEN it stopped applying, something the enum never could. And `vigente` was renamed to `aprobado` on 2026-09-14, when ADV-01 was written as a query and turned out to describe a defect in THIS FILE: after T9 the field no longer decides whether something rules, but the value was still called `vigente` -- so an agent reading `estado: vigente` on an expired guideline would present it as in force, which is exactly what ADV-01 forbids. A value whose NAME contradicts the model is a trap, and renaming it costs one enum in a type with 8 documents. `aprobado` also lines the type up with `Decision.estado`." },
         "fecha":           { "data_type": "date", "required": false, "note": "When it was written down. The interval says when it RULED." },
         "valido_desde":    { "data_type": "date", "required": false, "note": "When it STARTED to hold in the world, which is not when it was written: a decision taken in July can rule from May. Empty means it held from its `fecha`." },
         "valido_hasta":    { "data_type": "date", "required": false, "note": "When it STOPPED holding. Empty means it still holds -- that is the whole definition of `vigente`, and why it is not an enum value. With `reemplazada_por` it was superseded; without it, it simply expired, which is CQ-51." },
@@ -683,6 +683,17 @@
       "order": "desc",
       "scope_field": "proyecto",
       "view_note": "One row per dated field, not per document: a type with two date fields produces two events, which is why the view carries `campo`. Its shape -- fecha, tipo, campo, doc, title, and the scope field -- is structure rather than configuration, so it lives in the generator; what is declared here is what can change without changing code: the name, the direction, and which field scopes a query to one initiative. `order: desc` matches `log.md`, where the most recent is on top: someone reconstructing what happened reads backwards from now."
+    },
+    "scope_view": {
+      "note": "`proyecto` is declared by nine types, so «everything about project X» would otherwise be a nine-way UNION retyped inside every query that needs it -- and stale the day a tenth type gets the field. Generated from whoever declares the scope field, like the timeline and the validity views.",
+      "view": "documento_proyecto",
+      "field": "proyecto"
+    },
+    "query_log": {
+      "note": "`log-consultas.md` projected as one more table, so CQ-45 and CQ-46 carry a `sql:` like every other question instead of being exempted for living in markdown. The shape comes from `reserved_files[\"log-consultas.md\"].line_format`, which V26 already enforces -- the projector parses what the validator checks, so there is no second reading of the same line. ONLY THE COUNTS: the question text may carry what PERFIL.md marks confidential, and the two CQs need numbers, not words.",
+      "table": "consultas",
+      "source": "log-consultas.md",
+      "columns": ["fecha", "docs", "completos", "citados", "modo", "archivada"]
     },
     "search": {
       "note": "FTS5 full-text index, populated in the same pass as the projection. It returns PATHS AND RANK, never content: handing back snippets would put the reader back where cut 2 started, reading text to decide what to read. What makes finding cheap is choosing well with L0/L1 and then opening few. The permission to skip dense vectors is empirical, not a concession: the ablation in the Agent Zero paper (table 7) measures our exact restriction -- lexical-only loses 1.8 points against hybrid, grep-only 1.6, and all three restricted variants still beat the best external system.",

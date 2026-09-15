@@ -470,6 +470,14 @@ def render_ddl(contract: Contract) -> str:
     if vista:
         out.append(vista)
         out.append("")
+    alcance = render_scope_view(contract)
+    if alcance:
+        out.append(alcance)
+        out.append("")
+    log = render_query_log(contract)
+    if log:
+        out.append(log)
+        out.append("")
     vigencia = render_validity_view(contract)
     if vigencia:
         out.append(vigencia)
@@ -491,6 +499,46 @@ def search_columns(contract: Contract) -> List[str]:
     if cfg.get("include_body"):
         columns.append("cuerpo")
     return columns
+
+
+def render_scope_view(contract: Contract) -> str:
+    """Qué documento pertenece a qué proyecto, sobre todos los tipos que lo dicen."""
+    cfg = contract.projection.get("scope_view", {})
+    view, campo = cfg.get("view"), cfg.get("field", "proyecto")
+    if not view:
+        return ""
+    link = contract.projection.get("child_tables", {}).get("parent_column", "doc")
+    partes = [f'  select {_sql_ident(link)}, {_sql_ident(campo)} '
+              f'from {_sql_ident(name.lower())}'
+              for name in sorted(contract.types)
+              if not contract.types[name].get("generated_only")
+              and campo in (contract.types[name].get("fields") or {})]
+    if not partes:
+        return ""
+    return (f"-- Nueve tipos declaran `{campo}`: la unión se genera, no se\n"
+            f"-- reteclea en cada consulta que la necesita.\n"
+            f"CREATE VIEW {_sql_ident(view)} AS\n" + "\n  union all\n".join(partes) + ";")
+
+
+def render_query_log(contract: Contract) -> str:
+    """La tabla del log de consultas: qué se PREGUNTÓ, en números.
+
+    Sin el texto de la pregunta, a propósito. Las dos CQs que la consultan
+    necesitan conteos, y el enunciado puede llevar lo que `PERFIL.md` marca
+    confidencial: proyectar la palabra sería sacar de su sitio algo que el
+    perfil decidió que no salga.
+    """
+    cfg = contract.projection.get("query_log", {})
+    if not cfg.get("table"):
+        return ""
+    tipos = {"fecha": "TEXT", "docs": "INTEGER", "completos": "INTEGER",
+             "citados": "INTEGER", "modo": "TEXT", "archivada": "INTEGER"}
+    columnas = [f'  {_sql_ident(c)} {tipos.get(c, "TEXT")} NOT NULL'
+                for c in cfg.get("columns", [])]
+    columnas.insert(0, '  "linea" INTEGER NOT NULL PRIMARY KEY')
+    return ("-- Solo los conteos: el texto de la pregunta puede llevar lo que\n"
+            "-- `PERFIL.md` marca confidencial, y estas consultas piden números.\n"
+            + _sql_create(cfg["table"], [c.strip() for c in columnas]))
 
 
 def render_validity_view(contract: Contract) -> str:

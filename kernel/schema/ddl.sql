@@ -113,7 +113,7 @@ CREATE TABLE "lineamiento" (
   "doc" TEXT NOT NULL PRIMARY KEY REFERENCES "documentos"("path") ON DELETE CASCADE,
   "area" TEXT NOT NULL,
   "fuente" TEXT NOT NULL,
-  "estado" TEXT NOT NULL CHECK ("estado" IN ('vigente', 'en-revision')),
+  "estado" TEXT NOT NULL CHECK ("estado" IN ('aprobado', 'en-revision')),
   "fecha" TEXT,
   "valido_desde" TEXT,
   "valido_hasta" TEXT,
@@ -223,6 +223,39 @@ CREATE VIEW "eventos" AS
          t."proyecto" as "proyecto"
     from "reunion" t join "documentos" d on d."path" = t."doc"
   order by "fecha" desc;
+
+-- Nueve tipos declaran `proyecto`: la unión se genera, no se
+-- reteclea en cada consulta que la necesita.
+CREATE VIEW "documento_proyecto" AS
+  select "doc", "proyecto" from "analisis"
+  union all
+  select "doc", "proyecto" from "decision"
+  union all
+  select "doc", "proyecto" from "diagrama"
+  union all
+  select "doc", "proyecto" from "iniciativa"
+  union all
+  select "doc", "proyecto" from "insumo"
+  union all
+  select "doc", "proyecto" from "plan"
+  union all
+  select "doc", "proyecto" from "playbook"
+  union all
+  select "doc", "proyecto" from "pregunta"
+  union all
+  select "doc", "proyecto" from "reunion";
+
+-- Solo los conteos: el texto de la pregunta puede llevar lo que
+-- `PERFIL.md` marca confidencial, y estas consultas piden números.
+CREATE TABLE "consultas" (
+  "linea" INTEGER NOT NULL PRIMARY KEY,
+  "fecha" TEXT NOT NULL,
+  "docs" INTEGER NOT NULL,
+  "completos" INTEGER NOT NULL,
+  "citados" INTEGER NOT NULL,
+  "modo" TEXT NOT NULL,
+  "archivada" INTEGER NOT NULL
+) STRICT;
 
 -- Los tres estados de vigencia son una CONSULTA, no un enum: un
 -- valor puede contradecir a las fechas que tiene al lado; un CASE no.

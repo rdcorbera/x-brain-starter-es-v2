@@ -17,6 +17,7 @@ y esa es una propiedad que se puede comprobar.
 
 from __future__ import annotations
 
+import re
 import sqlite3
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -136,6 +137,9 @@ def project(contract: Contract, bundle: Path, db_path: Optional[Path] = None,
                        f'where "{columns[0]}" = ?', (rel,))
         stats["retirados"] += 1
 
+    consultas = _project_query_log(db, contract, bundle)
+    if consultas:
+        stats["consultas"] = consultas
     if not indexable:
         stats["sin índice"] = 1
     db.commit()
@@ -216,6 +220,46 @@ def search(contract: Contract, query: str, db_path: Optional[Path] = None,
         (query, limit)).fetchall()
     db.close()
     return rows
+
+
+def _project_query_log(db: sqlite3.Connection, contract: Contract,
+                       bundle: Path) -> int:
+    """El log de consultas, en números. Lo que se PREGUNTÓ al cerebro.
+
+    El patrón sale de `reserved_files`, que es el mismo que comprueba V26: el
+    proyector parsea exactamente lo que el validador valida, así que no hay una
+    segunda lectura de la misma línea que pueda discrepar de la primera.
+
+    Una línea mal formada **no se proyecta y no se inventa**: V26 ya la reporta
+    como lo que es, un defecto del log. Rellenar aquí un hueco sería fabricar
+    un dato de instrumentación, que es el peor sitio donde fabricar.
+    """
+    cfg = contract.projection.get("query_log", {})
+    tabla = cfg.get("table")
+    fuente = bundle / cfg.get("source", "log-consultas.md")
+    if not tabla or not fuente.exists():
+        return 0
+    spec = contract.reserved.get(cfg.get("source", ""), {}).get("line_format", {})
+    patron = spec.get("pattern")
+    if not patron:
+        return 0
+    db.execute(f'delete from "{tabla}"')
+    fecha, filas = None, 0
+    for numero, linea in enumerate(fuente.read_text(encoding="utf-8").splitlines(), 1):
+        encabezado = re.match(r"^##\s+(\d{4}-\d{2}-\d{2})\s*$", linea)
+        if encabezado:
+            fecha = encabezado.group(1)
+            continue
+        hit = re.match(patron, linea)
+        if not hit or not fecha:
+            continue
+        g = hit.groupdict()
+        db.execute(f'insert into "{tabla}" ("linea", "fecha", "docs", "completos", '
+                   f'"citados", "modo", "archivada") values (?, ?, ?, ?, ?, ?, ?)',
+                   (numero, fecha, int(g["docs"]), int(g["completos"]),
+                    int(g["citados"]), g["modo"], int(g["archivada"] == "archivada")))
+        filas += 1
+    return filas
 
 
 def _projectable(contract: Contract, doc: Document, tables: set) -> bool:

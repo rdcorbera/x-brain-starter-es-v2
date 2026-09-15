@@ -252,6 +252,23 @@ fallar. Desaparecen el `.venv`, el `requirements.txt` y el re-exec.
 - El reparto completo —cinco ejes, qué responde cada campo— vive en **`validity_model`** dentro
   del contrato, no en un plan aparte.
 
+### Las competency questions se ejecutan
+
+- Las 32 preguntas que el contrato dice saber responder **llevan ahora su consulta**, y el test
+  las corre todas. Eran el criterio de aceptación del esquema y se comprobaban leyéndolas; ahora
+  o corren contra el esquema o no corren.
+- **Las adversariales se ejecutan al revés**: describen lo que el cerebro *no* debe poder
+  responder, así que su consulta busca el defecto y tiene que volver vacía. Y cada una lleva un
+  defecto de prueba con el que se comprueba **que lo ve** — sin eso, una consulta ciega es
+  indistinguible de una que vigila, porque ambas devuelven vacío.
+- **`log-consultas.md` se proyecta** como una tabla más, con los conteos y nunca el texto de la
+  pregunta, que puede llevar lo que `PERFIL.md` marca confidencial. Es lo que permite preguntarle
+  al propio cerebro cuántos documentos hace falta abrir para responderle.
+- **`Lineamiento.estado`: `vigente` pasa a llamarse `aprobado`.** El valor afirmaba una vigencia
+  que ese campo ya no decide, y quien leyera `estado: vigente` en un lineamiento caducado lo
+  habría presentado como vigente. Lo encontró una pregunta adversarial al escribirse como
+  consulta.
+
 ### Migración desde un cerebro v1
 
 Los cerebros de v1 **no son conformes al perfil de v2** hasta migrarlos, pero siguen siendo

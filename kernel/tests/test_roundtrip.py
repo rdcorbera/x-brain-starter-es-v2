@@ -630,11 +630,27 @@ def check_projection(contract) -> List[str]:
         # corre contra el esquema, la CQ no está respondida, está redactada.
         problems += _check_timeline(local, db)
 
+        # Un documento con `verified` humano: sin él, `documentos_verified`
+        # queda vacía y toda consulta sobre esa tabla vuelve vacía por falta de
+        # datos, no por estar sano el corpus. Un test sobre una tabla vacía no
+        # distingue una cosa de la otra.
+        revisado = bundle / "caso-reunion.md"
+        revisado.write_text(
+            revisado.read_text(encoding="utf-8").replace(
+                "\nprocedencia:",
+                "\nverified: [{by: \"human:revisora\", at: 2026-09-14T09:00:00Z}]"
+                "\nprocedencia:", 1),
+            encoding="utf-8")
+        brain.project(local, bundle, db, full=True)
+
         # T7: el índice de texto, en la misma pasada que la proyección.
         problems += _check_search(local, bundle, db)
 
         # T9: el modelo de vigencia, sobre datos escritos para eso.
         problems += _check_validity(local, bundle, db)
+
+        # T8: y con la base poblada, las competency questions enteras.
+        problems += check_cq_sql(local, bundle, db)
 
         objetivo = bundle / "caso-reunion.md"
         objetivo.write_text(objetivo.read_text(encoding="utf-8")
@@ -685,6 +701,152 @@ def _cq_sql(cq: str) -> str:
     return " ".join(l.strip() for l in m.group(2).splitlines()) if m else ""
 
 
+# Valores de muestra para los parámetros de las CQs. El nombre del parámetro
+# ES su tipo: una consulta que pida `:proyecto` recibe un slug, una que pida
+# `:fecha` recibe una fecha. Así el runner no necesita saber nada de cada
+# pregunta, y una consulta que invente un parámetro nuevo falla en vez de
+# recibir un valor silenciosamente equivocado.
+CQ_PARAMS = {
+    "proyecto": "transversal", "persona": "/caso-persona.md",
+    "sistema": "/caso-sistema.md", "area": "seguridad", "equipo": "Pruebas",
+    "fecha": "2026-05-15", "desde": "2026-01-01", "hasta": "2026-12-31",
+    "hoy": "2026-09-14", "ahora": "2026-09-14T00:00:00Z", "dias": 30,
+    "termino": "contenido", "periodo": "2026-Q3", "actor": "human:prueba",
+    "clase": "flujo", "tema": "erp", "umbral": 90, "tipo": "Decision",
+}
+
+
+# Un defecto por adversarial. Sin esto, una consulta adversarial «pasa» por no
+# encontrar nada -- y no encontrar nada es su resultado esperado, así que una
+# consulta ciega es indistinguible de una que vigila. Verificado: quitarle la
+# condición a ADV-09 no hacía fallar el test, porque el cerebro de prueba no
+# tenía ni una fila de `documentos_verified` que pudiera dispararla.
+ADV_DEFECTOS = {
+    "ADV-03": ["insert into persona values ('p.md','Rol','Eq','/no-existe.md')"],
+    "ADV-04": ["update documentos set status='stable', stale_after='2020-01-01' "
+               "where path='d.md'"],
+    "ADV-05": ["update documentos set type='Persona', classification='internal' "
+               "where path='d.md'"],
+    "ADV-06": ["insert into decision_decisores values ('d.md',0,'/fantasma.md')"],
+    "ADV-07": ["update decision set estado='propuesta', valido_hasta='2026-05-01' "
+               "where doc='d.md'"],
+    "ADV-08": ["update decision set reemplazada_por='/otra.md', valido_hasta=null "
+               "where doc='d.md'"],
+    "ADV-09": ["insert into documentos_verified values "
+               "('d.md',0,'agente/1.0','2026-01-01T00:00:00Z')"],
+    "ADV-10": ["update documentos set stale_after='2020-01-01', status='stable' "
+               "where path='d.md'"],
+    "ADV-11": ["insert into persona values ('pa.md','R','E','/pb.md')",
+               "insert into persona values ('pb.md','R','E','/pa.md')"],
+    "ADV-12": ["insert into documentos_sources values ('d.md',0,'   ',null,null,null,null)"],
+}
+
+
+def _base_de_prueba(contract):
+    """Una base mínima con una decisión y dos personas, para romperla a propósito."""
+    import sqlite3
+    db = sqlite3.connect(":memory:")
+    db.executescript(brain.render_ddl(contract))
+    for path, tipo in (("d.md", "Decision"), ("pa.md", "Persona"),
+                       ("pb.md", "Persona"), ("p.md", "Persona")):
+        db.execute('insert into documentos ("path","hash","type","title",'
+                   '"description","resumen","procedencia","classification") '
+                   "values (?,?,?,'T','D','R','manual','confidential')",
+                   (path, "h", tipo))
+    db.execute("insert into decision values "
+               "('d.md','transversal','aceptada','2026-01-01',null,null,null)")
+    return db
+
+
+def _check_adversariales_ven(contract, yml) -> List[str]:
+    """Cada adversarial tiene que DETECTAR su defecto, no solo volver vacía."""
+    import sqlite3
+    problems = []
+    for m in re.finditer(r"^  - id: (ADV-\S+)", yml, re.M):
+        ident = m.group(1)
+        fin = yml.find("\n  - id: ", m.end())
+        sql = _sql_de_bloque(yml[m.start(): fin if fin > 0 else len(yml)])
+        if not sql:
+            continue
+        if ident not in ADV_DEFECTOS:
+            problems.append(f"{ident} lleva `sql:` pero no hay un defecto con el que "
+                            f"comprobar que lo ve: sin eso, «no devuelve filas» no "
+                            f"distingue vigilar de estar ciega")
+            continue
+        db = _base_de_prueba(contract)
+        try:
+            for sentencia in ADV_DEFECTOS[ident]:
+                db.execute(sentencia)
+            if not db.execute(sql, {n: CQ_PARAMS[n]
+                                    for n in set(re.findall(r":(\w+)", sql))}).fetchall():
+                problems.append(f"{ident} no ve su propio defecto: la consulta corre, "
+                                f"vuelve vacía siempre, y no vigila nada")
+        except sqlite3.Error as exc:
+            problems.append(f"{ident}: no se pudo comprobar que ve su defecto -- {exc}")
+        finally:
+            db.close()
+    return problems
+
+
+def _sql_de_bloque(bloque: str) -> str:
+    m = re.search(r"^(\s*)sql: >-\n((?:\1[ ]+\S.*\n)+)", bloque, re.M)
+    return " ".join(l.strip() for l in m.group(2).splitlines()) if m else ""
+
+
+def check_cq_sql(contract, bundle, db_path) -> List[str]:
+    """T8: toda competency question corre, y ninguna adversarial devuelve nada.
+
+    Las CQs eran el criterio de aceptación del contrato y se comprobaban a ojo.
+    Con `sql:` dejan de ser una lista de deseos: o la consulta corre contra el
+    esquema o no corre. Y las adversariales se ejecutan **al revés** -- describen
+    lo que el sistema no debe poder responder, así que su consulta busca el
+    defecto y tiene que volver vacía.
+    """
+    import sqlite3
+    yml_path = ROOT / "kernel" / "tests" / "competency-questions.yml"
+    if not yml_path.exists():
+        return []
+    yml = yml_path.read_text(encoding="utf-8")
+    exentas = set(re.findall(r"^\s*sql_exempt:\s*\[(.*?)\]", yml, re.M))
+    exentas = {x.strip() for grupo in exentas for x in grupo.split(",") if x.strip()}
+    problems, corridas = [], 0
+    db = sqlite3.connect(db_path)
+
+    for m in re.finditer(r"^  - id: (\S+)", yml, re.M):
+        ident = m.group(1)
+        fin = yml.find("\n  - id: ", m.end())
+        bloque = yml[m.start(): fin if fin > 0 else len(yml)]
+        sql = _sql_de_bloque(bloque)
+        if not sql:
+            if ident not in exentas:
+                problems.append(f"{ident} no tiene `sql:`: sigue siendo una "
+                                f"pregunta escrita, no una que el cerebro sepa "
+                                f"responder")
+            continue
+        faltan = [n for n in re.findall(r":(\w+)", sql) if n not in CQ_PARAMS]
+        if faltan:
+            problems.append(f"{ident} usa parámetros sin valor de muestra: "
+                            f"{', '.join(sorted(set(faltan)))}")
+            continue
+        params = {n: CQ_PARAMS[n] for n in set(re.findall(r":(\w+)", sql))}
+        try:
+            filas = db.execute(sql, params).fetchall()
+        except sqlite3.Error as exc:
+            problems.append(f"{ident}: su `sql:` no corre -- {exc}")
+            continue
+        corridas += 1
+        if ident.startswith("ADV") and filas:
+            problems.append(f"{ident} devuelve {len(filas)} fila(s) y debería "
+                            f"volver vacía: describe lo que el cerebro NO debe "
+                            f"poder responder")
+    db.close()
+    problems += _check_adversariales_ven(contract, yml)
+    if corridas < 40:
+        problems.append(f"solo corrieron {corridas} consultas: el corte 2 se "
+                        f"cierra cuando las 32 CQs y las adversariales pasan")
+    return problems
+
+
 def _check_validity(contract, bundle, db_path) -> List[str]:
     """T9: el intervalo manda, y CQ-48 y CQ-51 lo demuestran sobre los dos tipos.
 
@@ -715,7 +877,7 @@ def _check_validity(contract, bundle, db_path) -> List[str]:
              "reemplazada_por: /v-tres.md\n")
     escribir("v-tres.md", "Decision", "estado: aceptada\nvalido_desde: 2026-07-01\n")
     escribir("v-caducada.md", "Lineamiento",
-             "estado: vigente\nvalido_desde: 2025-01-01\nvalido_hasta: 2026-03-01\n")
+             "estado: aprobado\nvalido_desde: 2025-01-01\nvalido_hasta: 2026-03-01\n")
     brain.project(contract, bundle, db_path, full=True)
     db = sqlite3.connect(db_path)
 
