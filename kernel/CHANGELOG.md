@@ -269,6 +269,22 @@ fallar. Desaparecen el `.venv`, el `requirements.txt` y el re-exec.
   habría presentado como vigente. Lo encontró una pregunta adversarial al escribirse como
   consulta.
 
+### `/x-cosechar`: lo que se aprendió no se archiva con el proyecto
+
+- Al cerrar una iniciativa, recorre sus decisiones, análisis y preguntas respondidas y **propone**
+  qué merece vivir fuera del proyecto. **Propone, nunca promueve solo**, y cada fila se confirma
+  por separado: una promoción equivocada convierte una conclusión de un proyecto concreto en una
+  regla del área, que otros leerán fuera de contexto. No ensucia, desinforma.
+- **Lo promovido se reescribe, no se copia.** Una `Decision` responde *qué hicimos y por qué*; un
+  `Lineamiento`, *qué hacemos siempre*. Si al reescribirla no queda nada que valga fuera del
+  proyecto, es que no había nada que promover.
+- **Conserva el enlace a su origen en `sources`**, y no por cortesía: es lo que permite responder
+  «¿de dónde salió esta regla?» dentro de un año, y lo único que distingue una iniciativa
+  cosechada de una archivada en crudo. Sin ese enlace, la promoción es invisible para el sistema.
+- Lo que no se promueve **se archiva igual**: no promover nunca significa borrar. Y si no se
+  promovió nada, se dice — es un resultado legítimo, pero tiene que ser una conclusión y no un
+  silencio.
+
 ### Migración desde un cerebro v1
 
 Los cerebros de v1 **no son conformes al perfil de v2** hasta migrarlos, pero siguen siendo

@@ -348,6 +348,7 @@ frontmatter de cada módulo con `./brain stubs`.
 | `/x-consultar` | Responde con lo que hay en el cerebro y su fuente. Ofrece archivar la respuesta si hubo síntesis, y registra la consulta |
 | `/x-procesar-inbox` | El ritual diario: archiva el original en `raw/`, lo convierte, lo integra en todas las páginas que toca y vacía el inbox |
 | `/x-decision` | Registra o delibera una decisión, cruzándola contra las decisiones previas, los lineamientos y las fichas de sistema |
+| `/x-cosechar` | Al cerrar una iniciativa, **propone** qué promover a un área permanente. Cada promoción la confirma la persona |
 
 <!-- TODO: las filas restantes se agregan al escribir los módulos que faltan. -->
 

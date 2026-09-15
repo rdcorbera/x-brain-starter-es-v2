@@ -786,11 +786,21 @@ questions:
       los tres campos -- aquí Lineamiento: está por ser destino de promoción,
       no por aportar columnas.
     sql: >-
-      select d.type, d.title, i.periodo from documentos d
-      join documento_proyecto p on p.doc = d.path
-      join iniciativa i on i.proyecto = p.proyecto
-      where i.estado = 'entregada'
-      and d.type in ('Analisis', 'Decision', 'Lineamiento', 'Playbook')
+      select 'promovido' as caso, d.type, d.title, d.path, s.resource as origen
+        from documentos d
+        join documentos_sources s on s.doc = d.path
+        join documento_proyecto p on '/' || p.doc = s.resource
+        join iniciativa i on i.proyecto = p.proyecto
+        where i.estado = 'entregada' and d.path like '02-areas/%'
+      union all
+      select 'sin cosechar' as caso, 'Iniciativa' as type, d.title, i.doc as path,
+             null as origen
+        from iniciativa i join documentos d on d.path = i.doc
+        where i.estado = 'entregada'
+          and not exists (select 1 from documentos_sources s
+                          join documento_proyecto p2 on '/' || p2.doc = s.resource
+                          where p2.proyecto = i.proyecto and s.doc like '02-areas/%')
+      order by caso, type
 
   # -- procedencia: cómo entró cada cosa ---------------------------------------
 

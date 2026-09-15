@@ -649,6 +649,9 @@ def check_projection(contract) -> List[str]:
         # T9: el modelo de vigencia, sobre datos escritos para eso.
         problems += _check_validity(local, bundle, db)
 
+        # T10: la cosecha, que se ve por el enlace al origen o no se ve.
+        problems += _check_cosecha(local, bundle, db)
+
         # T8: y con la base poblada, las competency questions enteras.
         problems += check_cq_sql(local, bundle, db)
 
@@ -844,6 +847,84 @@ def check_cq_sql(contract, bundle, db_path) -> List[str]:
     if corridas < 40:
         problems.append(f"solo corrieron {corridas} consultas: el corte 2 se "
                         f"cierra cuando las 32 CQs y las adversariales pasan")
+    return problems
+
+
+def _check_cosecha(contract, bundle, db_path) -> List[str]:
+    """T10: lo promovido conserva enlace a su origen, y sin él no se ve.
+
+    El criterio dice «lo promovido conserva enlace a su origen». Aquí se
+    comprueba lo que eso significa de verdad: el enlace **es** lo que hace la
+    promoción visible. Sin `sources`, una iniciativa cosechada es
+    indistinguible de una archivada en crudo -- y CQ-50, que pregunta
+    exactamente por esa diferencia, la cuenta entre las que no dejaron nada.
+    """
+    import sqlite3
+    def doc(ruta, tipo, extra):
+        cuerpo = fill(brain.render_template(contract, tipo), contract, tipo)
+        # Se quitan las claves que `extra` redefine: repetirlas dejaría el
+        # frontmatter con la misma clave dos veces, que es YAML ambiguo.
+        redefinidas = [l.split(":", 1)[0] for l in extra.splitlines() if ":" in l]
+        cuerpo = re.sub(r"(?m)^(" + "|".join(redefinidas) + r"): .*\n", "", cuerpo)
+        frente, resto = cuerpo.split("---", 2)[1], cuerpo.split("---", 2)[2]
+        destino = bundle / ruta
+        destino.parent.mkdir(parents=True, exist_ok=True)
+        destino.write_text("---" + frente + extra + "---" + resto, encoding="utf-8")
+
+    cosechada = "01-proyectos/c-cosechada"
+    doc(f"{cosechada}/CONTEXT.md", "Iniciativa",
+        "proyecto: c-cosechada\nestado: entregada\n")
+    doc(f"{cosechada}/02-decisiones/dec-001.md", "Decision",
+        "proyecto: c-cosechada\nestado: aceptada\n")
+    doc("02-areas/operaciones/regla-promovida.md", "Lineamiento",
+        "area: operaciones\nestado: aprobado\nsources: [{resource: "
+        f"/{cosechada}/02-decisiones/dec-001.md" + "}]\n")
+    doc("01-proyectos/c-cruda/CONTEXT.md", "Iniciativa",
+        "proyecto: c-cruda\nestado: entregada\n")
+    brain.project(contract, bundle, db_path, full=True)
+
+    problems = []
+    sql = _cq_sql("CQ-50")
+    db = sqlite3.connect(db_path)
+    filas = {(r[0], r[3]) for r in db.execute(sql)}
+    if ("promovido", "02-areas/operaciones/regla-promovida.md") not in filas:
+        problems.append("CQ-50 no ve la promoción: un documento de área con "
+                        "`sources` a una iniciativa entregada es exactamente lo "
+                        "que la cosecha produce")
+    if ("sin cosechar", "01-proyectos/c-cruda/CONTEXT.md") not in filas:
+        problems.append("CQ-50 no ve la iniciativa cerrada sin nada promovido, "
+                        "que es la mitad que nadie echa en falta")
+    if ("sin cosechar", f"{cosechada}/CONTEXT.md") in filas:
+        problems.append("CQ-50 cuenta como no cosechada una iniciativa que sí "
+                        "promovió algo")
+    db.close()
+
+    # Sin el enlace al origen, la promoción deja de existir para el sistema.
+    promovido = bundle / "02-areas/operaciones/regla-promovida.md"
+    promovido.write_text(
+        re.sub(r"(?m)^sources:.*\n", "", promovido.read_text(encoding="utf-8")),
+        encoding="utf-8")
+    brain.project(contract, bundle, db_path, full=True)
+    db = sqlite3.connect(db_path)
+    sin_enlace = {(r[0], r[3]) for r in db.execute(sql)}
+    db.close()
+    # Las DOS mitades. Comprobar solo que la iniciativa pase a «sin cosechar»
+    # no basta: una consulta rota puede devolverla por los dos lados a la vez,
+    # y de hecho lo hizo al inyectarle el defecto. Lo que prueba que el enlace
+    # es lo que sostiene la promoción es que la promoción DESAPAREZCA.
+    if ("promovido", "02-areas/operaciones/regla-promovida.md") in sin_enlace:
+        problems.append("sin `sources`, el documento de área sigue contando como "
+                        "promovido: entonces la promoción se detecta por la "
+                        "carpeta y no por el enlace, y CQ-50 mide otra cosa")
+    if ("sin cosechar", f"{cosechada}/CONTEXT.md") not in sin_enlace:
+        problems.append("al quitar `sources` la iniciativa no pasa a contar como "
+                        "no cosechada: el enlace no está sosteniendo nada")
+
+    for ruta in (f"{cosechada}/CONTEXT.md", f"{cosechada}/02-decisiones/dec-001.md",
+                 "02-areas/operaciones/regla-promovida.md",
+                 "01-proyectos/c-cruda/CONTEXT.md"):
+        (bundle / ruta).unlink()
+    brain.project(contract, bundle, db_path, full=True)
     return problems
 
 
