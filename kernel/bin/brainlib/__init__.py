@@ -8,7 +8,7 @@ El corte es **por trabajo, nunca arbitrario** — esa era la condición:
     const.py      el vocabulario compartido, que no es de nadie
     parse.py      LEER      OKF-YAML, documentos, contrato, moldes
     generate.py   ESCRIBIR  plantillas, esquemas, índices, derivados, stubs, DDL
-    validate.py   COMPROBAR los 25 checks, en dos niveles
+    validate.py   COMPROBAR los 26 checks, en dos niveles
     report.py     RENDIR    lo que los otros tres encontraron
     project.py    PROYECTAR los documentos a una base consultable
 

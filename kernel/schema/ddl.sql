@@ -55,8 +55,10 @@ CREATE TABLE "analisis" (
 CREATE TABLE "decision" (
   "doc" TEXT NOT NULL PRIMARY KEY REFERENCES "documentos"("path") ON DELETE CASCADE,
   "proyecto" TEXT NOT NULL,
-  "estado" TEXT NOT NULL CHECK ("estado" IN ('propuesta', 'aceptada', 'reemplazada', 'obsoleta')),
+  "estado" TEXT NOT NULL CHECK ("estado" IN ('propuesta', 'aceptada')),
   "fecha" TEXT NOT NULL,
+  "valido_desde" TEXT,
+  "valido_hasta" TEXT,
   "reemplazada_por" TEXT
 ) STRICT;
 
@@ -111,7 +113,11 @@ CREATE TABLE "lineamiento" (
   "doc" TEXT NOT NULL PRIMARY KEY REFERENCES "documentos"("path") ON DELETE CASCADE,
   "area" TEXT NOT NULL,
   "fuente" TEXT NOT NULL,
-  "vigencia" TEXT NOT NULL CHECK ("vigencia" IN ('vigente', 'en-revision', 'derogado'))
+  "estado" TEXT NOT NULL CHECK ("estado" IN ('vigente', 'en-revision')),
+  "fecha" TEXT,
+  "valido_desde" TEXT,
+  "valido_hasta" TEXT,
+  "reemplazada_por" TEXT
 ) STRICT;
 
 CREATE TABLE "persona" (
@@ -177,6 +183,31 @@ CREATE VIEW "eventos" AS
          t."proyecto" as "proyecto"
     from "decision" t join "documentos" d on d."path" = t."doc"
   union all
+  select t."valido_desde" as "fecha", 'Decision' as "tipo", 'valido_desde' as "campo",
+         d."path" as "doc", d."title" as "title",
+         t."proyecto" as "proyecto"
+    from "decision" t join "documentos" d on d."path" = t."doc"
+  union all
+  select t."valido_hasta" as "fecha", 'Decision' as "tipo", 'valido_hasta' as "campo",
+         d."path" as "doc", d."title" as "title",
+         t."proyecto" as "proyecto"
+    from "decision" t join "documentos" d on d."path" = t."doc"
+  union all
+  select t."fecha" as "fecha", 'Lineamiento' as "tipo", 'fecha' as "campo",
+         d."path" as "doc", d."title" as "title",
+         null as "proyecto"
+    from "lineamiento" t join "documentos" d on d."path" = t."doc"
+  union all
+  select t."valido_desde" as "fecha", 'Lineamiento' as "tipo", 'valido_desde' as "campo",
+         d."path" as "doc", d."title" as "title",
+         null as "proyecto"
+    from "lineamiento" t join "documentos" d on d."path" = t."doc"
+  union all
+  select t."valido_hasta" as "fecha", 'Lineamiento' as "tipo", 'valido_hasta' as "campo",
+         d."path" as "doc", d."title" as "title",
+         null as "proyecto"
+    from "lineamiento" t join "documentos" d on d."path" = t."doc"
+  union all
   select t."ultima_revision" as "fecha", 'Plan' as "tipo", 'ultima-revision' as "campo",
          d."path" as "doc", d."title" as "title",
          t."proyecto" as "proyecto"
@@ -192,6 +223,29 @@ CREATE VIEW "eventos" AS
          t."proyecto" as "proyecto"
     from "reunion" t join "documentos" d on d."path" = t."doc"
   order by "fecha" desc;
+
+-- Los tres estados de vigencia son una CONSULTA, no un enum: un
+-- valor puede contradecir a las fechas que tiene al lado; un CASE no.
+CREATE VIEW "vigencia" AS
+  select d."path" as "doc", 'Decision' as "tipo", d."title" as "title",
+         t."valido_desde" as "valido_desde", t."valido_hasta" as "valido_hasta",
+         t."reemplazada_por" as "reemplazada_por", t."estado" as "estado",
+         case
+           when valido_hasta IS NULL then 'vigente'
+           when valido_hasta IS NOT NULL AND reemplazada_por IS NOT NULL then 'reemplazada'
+           when valido_hasta IS NOT NULL AND reemplazada_por IS NULL then 'caducada'
+         end as "vigencia"
+    from "decision" t join "documentos" d on d."path" = t."doc"
+  union all
+  select d."path" as "doc", 'Lineamiento' as "tipo", d."title" as "title",
+         t."valido_desde" as "valido_desde", t."valido_hasta" as "valido_hasta",
+         t."reemplazada_por" as "reemplazada_por", t."estado" as "estado",
+         case
+           when valido_hasta IS NULL then 'vigente'
+           when valido_hasta IS NOT NULL AND reemplazada_por IS NOT NULL then 'reemplazada'
+           when valido_hasta IS NOT NULL AND reemplazada_por IS NULL then 'caducada'
+         end as "vigencia"
+    from "lineamiento" t join "documentos" d on d."path" = t."doc";
 
 -- Devuelve rutas y ranking, nunca contenido: entregar fragmentos
 -- dejaría al lector donde empezó, leyendo texto para decidir qué leer.

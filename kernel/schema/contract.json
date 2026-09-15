@@ -1,5 +1,5 @@
 {
-  "note": "Single source of truth for this brain's data contract. Templates, JSON Schemas, the catalog, the portable bundle schema, the skill stubs, the directory indexes, the derived indexes and (in cut 2) the SQLite DDL are all GENERATED from this file. Never edit a generated artifact; edit this and run `brain generate`. READING ORDER -- the top-level keys are ordered as a narrative, separated by blank lines, rather than nested into groups: (1) what this contract is -- note, versions, provenance, governance, and the policies it is written under; (2) the vocabulary the schema is written in -- data types, actors, and the classification ladder, each defined before it is used; (3) the schema itself -- common_fields and types, which are 59% of the file; (4) the files it produces -- reserved, exempt, derived, the portable bundle schema and the SQLite projection. Grouping these into nested objects was considered and rejected: the groups are wildly uneven, the boundaries are genuinely ambiguous (classification is both vocabulary and policy), and nesting would lengthen every access path and every provenance entry for no functional gain.",
+  "note": "Single source of truth for this brain's data contract. Templates, JSON Schemas, the catalog, the portable bundle schema, the skill stubs, the directory indexes, the derived indexes and (in cut 2) the SQLite DDL are all GENERATED from this file. Never edit a generated artifact; edit this and run `brain generate`. READING ORDER -- the top-level keys are ordered as a narrative, separated by blank lines, rather than nested into groups: (1) what this contract is -- note, versions, provenance, governance, and the policies it is written under; (2) the vocabulary the schema is written in -- the validity model, data types, actors, and the classification ladder, each defined before it is used; (3) the schema itself -- common_fields and types, which are 59% of the file; (4) the files it produces -- reserved, exempt, derived, the portable bundle schema and the SQLite projection. Grouping these into nested objects was considered and rejected: the groups are wildly uneven, the boundaries are genuinely ambiguous (classification is both vocabulary and policy), and nesting would lengthen every access path and every provenance entry for no functional gain.",
   "okf_version": "0.2",
   "profile_version": 2,
 
@@ -76,6 +76,29 @@
   "severity_policy": {
     "note": "Migration ladder. Constraints that v1's templates already guaranteed ship as `error`. Constraints introduced by OKF v0.2 ship as `warning` in profile_version 1, so a real brain does not light up on day one. Tightening a constraint means flipping it to `error` and bumping profile_version.",
     "default": "error"
+  },
+
+  "validity_model": {
+    "note": "Which field answers «is this still true?». It is written here because the answer used to be spread across SIX mechanisms that nobody had listed side by side -- and the contract itself admitted one of them was redundant (`Lineamiento.vigencia`: «does the same job as `estado` elsewhere»). Six overlapping answers do not make a system stricter; they make it impossible to say which one is right when they disagree. T9 (2026-09-14) assigned one axis to each.",
+    "principle": "ONE FACT, ONE PLACE. The interval is the only source of «did it rule?»; every other field answers a different question.",
+    "axes": {
+      "world_time":  { "fields": ["valido_desde", "valido_hasta"], "answers": "Between which dates was it true IN THE WORLD? Not when it was written: a decision taken in July can rule from May." },
+      "lifecycle":   { "fields": ["estado"], "answers": "Where is the SUBJECT in its own cycle -- proposed, accepted, under review? Never whether it still rules." },
+      "genealogy":   { "fields": ["reemplazada_por"], "answers": "What replaced it, if anything." },
+      "editorial":   { "fields": ["status"], "answers": "Is the DOCUMENT finished or withdrawn? OKF's, untouched: a stable document can describe a rule that expired." },
+      "review":      { "fields": ["stale_after"], "answers": "When should someone look at this again? OKF's, untouched. It asks for a review, it does not claim anything expired." }
+    },
+    "derived_states": {
+      "note": "The three states that used to be enum values are now QUERIES. That is the point: an enum value can contradict the dates beside it; a query cannot.",
+      "vigente":     "valido_hasta IS NULL",
+      "reemplazada": "valido_hasta IS NOT NULL AND reemplazada_por IS NOT NULL",
+      "caducada":    "valido_hasta IS NOT NULL AND reemplazada_por IS NULL"
+    },
+    "applies_to": ["Decision", "Lineamiento"],
+    "view": "vigencia",
+    "view_note": "One view over every type that carries an interval, so CQ-48 and CQ-51 are answered across both instead of once per type. The derived state is a CASE built from `derived_states` above -- the three sentences that used to be enum values are generated from the contract, not retyped in SQL, so they cannot drift apart from what the contract says they mean.",
+    "enforced_by": "V24",
+    "rejected": "A `rechazada` value for the half of `obsoleta` the interval cannot express -- a proposal studied and turned down. No competency question asks for it, and the contract's cutting rule is explicit: a value no question needs does not enter. Recorded here so the next person does not re-derive the idea and assume it was overlooked."
   },
 
   "data_types": {
@@ -356,19 +379,15 @@
       "filename": "dec-{NNN}-{tema}.md",
       "fields": {
         "proyecto":        { "data_type": "type-key", "to": "Iniciativa", "sentinels": ["transversal"], "required": true, "default": "transversal" },
-        "estado":          { "data_type": "enum", "values": ["propuesta", "aceptada", "reemplazada", "obsoleta"], "default": "propuesta", "required": true },
+        "estado":          { "data_type": "enum", "values": ["propuesta", "aceptada"], "default": "propuesta", "required": true,
+                             "note": "The SUBJECT's lifecycle, and only that. `reemplazada` and `obsoleta` were removed in T9: whether something still rules is the interval's job, and having both meant two fields answering one question and eventually disagreeing. `rechazada` was considered for the half of `obsoleta` the interval cannot express -- a proposal studied and turned down -- and left out because no competency question asks for it. The cutting rule is explicit: a value no question needs does not enter." },
         "fecha":           { "data_type": "date", "required": true },
+        "valido_desde":    { "data_type": "date", "required": false, "note": "When it STARTED to hold in the world, which is not when it was written: a decision taken in July can rule from May. Empty means it held from its `fecha`." },
+        "valido_hasta":    { "data_type": "date", "required": false, "note": "When it STOPPED holding. Empty means it still holds -- that is the whole definition of `vigente`, and why it is not an enum value. With `reemplazada_por` it was superseded; without it, it simply expired, which is CQ-51." },
+
         "decisores":       { "data_type": "list", "of": "typed-ref", "to": "Persona" },
-        "reemplazada_por": { "data_type": "link", "required": false, "note": "new in v2: makes supersession queryable instead of narrative" }
+        "reemplazada_por": { "data_type": "link", "required": false, "note": "GENEALOGY: what replaced it. Not whether it still rules -- that is `valido_hasta`. The two together are what separates «superseded» from «expired», which no single field could say. (It used to be described here as the hook for cut 3's bi-temporal fact model; T9 replaced that plan with the declared interval, and this note is rewritten rather than left describing a design that is no longer the live one.)" }
       },
-      "conditions": [
-        {
-          "if": { "estado": "reemplazada" },
-          "then_required": ["reemplazada_por"],
-          "severity": "warning",
-          "note": "The supersession rule as a structural constraint rather than a prompt instruction. Ships as a warning because v1 recorded supersession in prose; tighten to error once migrated. This is also the hook the bi-temporal fact model hangs off in cut 3."
-        }
-      ],
       "sections": [
         { "heading": "Contexto", "guide": "Qué problema o fuerza motiva la decisión. Enlazar documentos, reuniones y lineamientos aplicables.", "required": true },
         { "heading": "Opciones consideradas", "guide": "una subsección por opción, con pros y contras", "required": true },
@@ -444,7 +463,12 @@
       "fields": {
         "area":     { "data_type": "text", "required": true, "placeholder": "nombre del área en /02-areas/" },
         "fuente":   { "data_type": "person-ref", "required": true, "steward": true, "placeholder": "quién lo definió — enlace a ficha, comité o área", "note": "who defined it. Accepts a committee or an area as free text; V17 reports it until it points at a ficha." },
-        "vigencia": { "data_type": "enum", "values": ["vigente", "en-revision", "derogado"], "default": "vigente", "required": true, "note": "does the same job as `estado` elsewhere under a different name; kept for compatibility" }
+        "estado":          { "data_type": "enum", "values": ["vigente", "en-revision"], "default": "vigente", "required": true,
+                             "note": "Renamed from `vigencia` in T9 -- it did the same job as `estado` elsewhere under another name, and the compatibility that justified keeping it was retired. `derogado` left the enum: a repealed guideline is one with a `valido_hasta` in the past, which also says WHEN it stopped applying, something the enum never could." },
+        "fecha":           { "data_type": "date", "required": false, "note": "When it was written down. The interval says when it RULED." },
+        "valido_desde":    { "data_type": "date", "required": false, "note": "When it STARTED to hold in the world, which is not when it was written: a decision taken in July can rule from May. Empty means it held from its `fecha`." },
+        "valido_hasta":    { "data_type": "date", "required": false, "note": "When it STOPPED holding. Empty means it still holds -- that is the whole definition of `vigente`, and why it is not an enum value. With `reemplazada_por` it was superseded; without it, it simply expired, which is CQ-51." },
+        "reemplazada_por": { "data_type": "link", "required": false, "note": "Same genealogy as in `Decision`. A guideline is superseded as often as a decision, and until T9 there was nowhere to say so." }
       },
       "sections": [
         { "heading": "El lineamiento", "guide": "La regla, tal como aplica. Concreta y verificable.", "required": true },

@@ -58,10 +58,27 @@ escribir el documento es el trámite.
 | **Lineamientos vigentes** | `02-areas/` | Se advierte con el enlace. **El usuario decide** si procede como excepción, y entonces la excepción se documenta en `# Consecuencias` |
 | **Fichas de `Sistema`** | `03-recursos/sistemas-y-herramientas/` | Si lo que la decisión asume no coincide con la ficha, **eso es una `Pregunta`**, no un supuesto |
 
-**La supersesión se registra, no se narra.** Si esta decisión reemplaza a otra, la anterior pasa a
-`estado: reemplazada` con `reemplazada_por` apuntando a la nueva — el contrato exige ese campo
-cuando el estado lo dice. **La decisión superada no se borra ni se edita en su fondo:** queda
-donde está, marcada, y por eso se puede reconstruir qué se creía y cuándo.
+**La supersesión se registra, no se narra.** Si esta decisión reemplaza a otra, en la anterior se
+escriben **dos** campos:
+
+```yaml
+valido_hasta: AAAA-MM-DD          # el día que dejó de regir — normalmente el `valido_desde` de la nueva
+reemplazada_por: /ruta/a/la/nueva.md
+```
+
+**No hay un `estado: reemplazada`, y su ausencia es deliberada** (T9): si «¿sigue rigiendo?» lo
+contestaran un enum y unas fechas a la vez, algún día se contradirían. Lo contesta el intervalo, y
+solo el intervalo. `estado` responde otra cosa —si la decisión está `propuesta` o `aceptada`— y no
+cambia porque llegue una sucesora: lo que se aceptó, aceptado estuvo.
+
+De ahí salen los tres casos, que ya no son valores sino consultas: **vigente** es `valido_hasta`
+vacío; **reemplazada**, `valido_hasta` con `reemplazada_por`; **caducada**, `valido_hasta` sin
+sucesor — una regla que expiró y nadie sustituyó, que es justo el hueco que nadie ve hasta que
+alguien decide sin criterio. **V24** comprueba que el intervalo sea coherente, y `reemplazada_por`
+sin `valido_hasta` es un error: algo sustituido dejó de regir en alguna fecha.
+
+**La decisión superada no se borra ni se edita en su fondo:** queda donde está, con su intervalo
+cerrado, y por eso se puede reconstruir qué se creía y cuándo.
 
 **Nunca se elige en silencio.** Dos decisiones que se contradicen y conviven sin decirlo son
 exactamente el modo de fallo que el sistema existe para evitar.

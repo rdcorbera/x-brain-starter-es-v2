@@ -11,7 +11,7 @@ resumen_hash: <sha256 del cuerpo, que imprime `./brain hash ARCHIVO --body` (o l
 procedencia: fuente          # fuente | dialogo | inferido | manual | derivado
 area: <nombre del área en /02-areas/>
 fuente: <quién lo definió — enlace a ficha, comité o área>
-vigencia: vigente          # vigente | en-revision | derogado
+estado: vigente          # vigente | en-revision
 ---
 
 # El lineamiento

@@ -470,6 +470,10 @@ def render_ddl(contract: Contract) -> str:
     if vista:
         out.append(vista)
         out.append("")
+    vigencia = render_validity_view(contract)
+    if vigencia:
+        out.append(vigencia)
+        out.append("")
     indice = render_search_index(contract)
     if indice:
         out.append(indice)
@@ -487,6 +491,43 @@ def search_columns(contract: Contract) -> List[str]:
     if cfg.get("include_body"):
         columns.append("cuerpo")
     return columns
+
+
+def render_validity_view(contract: Contract) -> str:
+    """Qué regía y cuándo, sobre todos los tipos que llevan intervalo.
+
+    El estado derivado se construye desde `derived_states` del contrato, no se
+    reescribe aquí: las tres frases que antes eran valores de enum —vigente,
+    reemplazada, caducada— se generan de donde está declarado qué significan.
+    Retecleadas en SQL, acabarían diciendo algo distinto del contrato sin que
+    nadie lo notara, que es exactamente el defecto que T9 vino a cerrar.
+    """
+    model = contract.data.get("validity_model", {})
+    view = model.get("view")
+    tipos = [t for t in model.get("applies_to", []) if t in contract.types]
+    if not view or not tipos:
+        return ""
+    docs = contract.projection.get("documents_table", "documentos")
+    key = _primary_key(contract, docs)
+    link = contract.projection.get("child_tables", {}).get("parent_column", "doc")
+    estados = {k: v for k, v in model.get("derived_states", {}).items() if k != "note"}
+    caso = "\n".join(f"           when {expr} then '{nombre}'"
+                      for nombre, expr in estados.items())
+    partes = []
+    for type_name in tipos:
+        partes.append(
+            f'  select d.{_sql_ident(key)} as {_sql_ident(link)}, '
+            f"'{type_name}' as \"tipo\", d.\"title\" as \"title\",\n"
+            f'         t."valido_desde" as "valido_desde", '
+            f't."valido_hasta" as "valido_hasta",\n'
+            f'         t."reemplazada_por" as "reemplazada_por", '
+            f't."estado" as "estado",\n'
+            f'         case\n{caso}\n         end as {_sql_ident(view)}\n'
+            f'    from {_sql_ident(type_name.lower())} t '
+            f'join {_sql_ident(docs)} d on d.{_sql_ident(key)} = t.{_sql_ident(link)}')
+    return ("-- Los tres estados de vigencia son una CONSULTA, no un enum: un\n"
+            "-- valor puede contradecir a las fechas que tiene al lado; un CASE no.\n"
+            f"CREATE VIEW {_sql_ident(view)} AS\n" + "\n  union all\n".join(partes) + ";")
 
 
 def render_search_index(contract: Contract) -> str:

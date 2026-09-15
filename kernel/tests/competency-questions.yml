@@ -553,6 +553,12 @@ questions:
       ATENCIÓN: ocho CQs ya dependen de `Decision`, que tiene cero documentos en
       el cerebro real. Auditar ese hueco antes de construir encima -- ver
       corpus_reality_check.
+    sql: >-
+      select tipo, title, doc, valido_desde, valido_hasta, reemplazada_por
+      from vigencia
+      where (valido_desde is null or valido_desde <= :fecha)
+        and (valido_hasta is null or valido_hasta > :fecha)
+      order by tipo, valido_desde
 
   - id: CQ-51
     question: "¿Qué reglas caducaron sin que nadie las reemplazara?"
@@ -581,6 +587,10 @@ questions:
       `reemplazada_por` ES la definición de caducado sin reemplazo, así que esta
       CQ deja de necesitar un `estado` que lo diga aparte. Es el caso que la
       opción B expresa mejor que ninguna otra.
+    sql: >-
+      select tipo, title, doc, valido_hasta from vigencia
+      where vigencia = 'caducada' and valido_hasta <= :hoy
+      order by valido_hasta desc
 
   # -- encontrar sin navegar índices -------------------------------------------
 
@@ -858,7 +868,7 @@ intake_corrections:
     afecta al fondo de la pregunta; todos habrían roto el SQL del corte 2.
   corrections:
     - {cq: CQ-24, was: "status=vigente",   now: "status=stable",        why: "`vigente` no está en el enum de status (draft|stable|deprecated)"}
-    - {cq: CQ-27, was: "estado=vigente",   now: "estado=aceptada",      why: "Decision.estado es propuesta|aceptada|reemplazada|obsoleta"}
+    - {cq: CQ-27, was: "estado=vigente",   now: "estado=aceptada",      why: "Decision.estado era entonces propuesta|aceptada|reemplazada|obsoleta; desde T9 (2026-09-14) es propuesta|aceptada y la vigencia la lleva el intervalo. La corrección sigue siendo válida: `aceptada` no ha cambiado"}
     - {cq: CQ-29, was: "estado=vigente",   now: "Decision.estado=aceptada", why: "no existe en Decision ni en Sistema (activo|en-cambio|deprecado)"}
     - {cq: CQ-37, was: "fields incluía proyecto con types vacío", now: "fields: [classification]", why: "`proyecto` no es campo común: lo declaran 8 de 13 tipos"}
     - {cq: CQ-40, was: "fields incluía periodo", now: "rango sobre fecha", why: "`periodo` es campo de Iniciativa, no de Decision"}

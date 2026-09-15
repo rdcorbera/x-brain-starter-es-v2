@@ -37,7 +37,7 @@ idempotente. Doce subcomandos; los que cambian el día a día:
 
 - **`init`** — materializa un cerebro: estructura, esquema portable, índices y derivados. El
   starter ya no versiona un `cerebro/` con TODOs: llega vacío y esto lo construye.
-- **`validate`** — 25 comprobaciones en dos niveles (OKF / perfil), porque OKF es
+- **`validate`** — 26 comprobaciones en dos niveles (OKF / perfil), porque OKF es
   deliberadamente permisivo y un validador estricto sobre él no sería conformante.
   **`--fix`** repara lo mecánico *preservando el significado, y verificándolo*: reparsea cada
   línea de frontmatter antes de escribirla, y nunca reescribe lo que redactó una persona.
@@ -228,6 +228,29 @@ fallar. Desaparecen el `.venv`, el `requirements.txt` y el re-exec.
 - Saltarse los vectores densos no es una concesión: la ablación del paper de Agent Zero mide esta
   misma restricción —solo léxico pierde 1,8 puntos frente al híbrido— y las tres variantes
   restringidas siguen por encima del mejor sistema externo.
+
+### La vigencia deja de estar en seis sitios
+
+- **Había seis mecanismos** para responder *«¿esto sigue valiendo?»* —`status`, `stale_after`,
+  `Decision.estado`, `reemplazada_por`, `Lineamiento.vigencia` y las fechas nuevas—, y el propio
+  contrato admitía que uno sobraba. Seis respuestas solapadas no hacen un sistema más estricto:
+  hacen imposible saber cuál vale cuando se contradicen.
+- **Ahora manda el intervalo.** `valido_desde`/`valido_hasta` son la única fuente de «¿rigió?».
+  `Decision.estado` adelgaza a `propuesta`·`aceptada`; `Lineamiento.vigencia` se **renombra a
+  `estado`** y pierde `derogado`; ambos tipos ganan el intervalo, y `Lineamiento` también
+  `reemplazada_por`.
+- **Los tres estados dejan de ser valores y pasan a ser consultas**: vigente es `valido_hasta`
+  vacío; reemplazada, con sucesor; **caducada, sin él**. Ese último caso es el que un modelo
+  derivado de la cadena de supersesión no puede expresar —sin sucesor no hay fecha de cierre y la
+  regla figura vigente para siempre—, y es exactamente lo que hay que detectar antes de que
+  alguien decida sin criterio.
+- **Una decisión tomada en julio puede regir desde mayo.** El intervalo lo dice; la fecha del
+  documento, no.
+- **`V24`** comprueba lo que un intervalo puede tener de incoherente: que acabe antes de empezar,
+  que algo sustituido no tenga fecha de cierre, y que dos documentos se declaren sucesores el uno
+  del otro.
+- El reparto completo —cinco ejes, qué responde cada campo— vive en **`validity_model`** dentro
+  del contrato, no en un plan aparte.
 
 ### Migración desde un cerebro v1
 

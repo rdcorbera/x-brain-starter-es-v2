@@ -96,12 +96,18 @@
       "type": "string",
       "enum": [
         "propuesta",
-        "aceptada",
-        "reemplazada",
-        "obsoleta"
+        "aceptada"
       ]
     },
     "fecha": {
+      "type": "string",
+      "format": "date"
+    },
+    "valido_desde": {
+      "type": "string",
+      "format": "date"
+    },
+    "valido_hasta": {
       "type": "string",
       "format": "date"
     },

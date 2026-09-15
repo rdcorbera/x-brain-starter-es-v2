@@ -217,6 +217,13 @@ La política que no se ejecuta no es un control. Estas son ejecutables.
 - **Responsabilidad.** `dueño`, `responsable` y `fuente` aceptan un enlace a una ficha
   `Persona` —que se verifica— o un nombre en texto libre, que se tolera y se reporta hasta
   resolverse (V17).
+- **Vigencia.** *«¿Esto sigue valiendo?»* lo responde **una sola cosa**: el intervalo
+  `valido_desde`/`valido_hasta` de una `Decision` o un `Lineamiento`. `estado` dice dónde está el
+  documento en su propio ciclo (`propuesta`/`aceptada`), no si rige; `reemplazada_por` dice qué lo
+  sustituyó; `status` y `stale_after` son del documento, no de la regla. **Vigente** es
+  `valido_hasta` vacío; **reemplazada**, con sucesor; **caducada**, sin él — y esa última es la que
+  ningún modelo derivado sabe ver, porque sin sucesor una regla figura vigente para siempre. El
+  reparto entero está en `validity_model` del contrato y lo comprueba **V24**.
 - **Confianza.** `generated` frente a `verified`: que *«esto lo escribió un agente y nadie lo
   revisó»* sea consultable, y no una suposición. Y **`procedencia`**, que responde lo que
   `generated` no puede: *cómo entró* la afirmación — `fuente` si se leyó de un insumo, `dialogo`
@@ -302,7 +309,7 @@ x-brain/
 │   │   │   ├── const.py          ←   el vocabulario compartido
 │   │   │   ├── parse.py          ←   LEER: OKF-YAML, documentos, contrato, moldes
 │   │   │   ├── generate.py       ←   ESCRIBIR: plantillas, índices, derivados, stubs, DDL
-│   │   │   ├── validate.py       ←   COMPROBAR: los 25 checks, en dos niveles
+│   │   │   ├── validate.py       ←   COMPROBAR: los 26 checks, en dos niveles
 │   │   │   ├── report.py         ←   RENDIR: lo que los otros tres encontraron
 │   │   │   └── project.py        ←   PROYECTAR: el cerebro a una base SQLite
 │   │   ├── to-markdown.py         ← insumos binarios → markdown (cero tokens)

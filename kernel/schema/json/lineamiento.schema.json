@@ -95,13 +95,27 @@
     "fuente": {
       "type": "string"
     },
-    "vigencia": {
+    "estado": {
       "type": "string",
       "enum": [
         "vigente",
-        "en-revision",
-        "derogado"
+        "en-revision"
       ]
+    },
+    "fecha": {
+      "type": "string",
+      "format": "date"
+    },
+    "valido_desde": {
+      "type": "string",
+      "format": "date"
+    },
+    "valido_hasta": {
+      "type": "string",
+      "format": "date"
+    },
+    "reemplazada_por": {
+      "type": "string"
     }
   },
   "required": [
@@ -116,6 +130,6 @@
     "procedencia",
     "area",
     "fuente",
-    "vigencia"
+    "estado"
   ]
 }

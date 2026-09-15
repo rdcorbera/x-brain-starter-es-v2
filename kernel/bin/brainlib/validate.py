@@ -1,4 +1,4 @@
-"""Validar: los 25 checks, en dos niveles.
+"""Validar: los 26 checks, en dos niveles.
 
 OKF comprueba la conformidad con la spec, que es deliberadamente permisiva;
 perfil comprueba lo nuestro, que puede endurecerse sin romper aquella."""
@@ -70,6 +70,7 @@ CHECKS = {
     "V21": ("profile", "`periodo` sigue el formato declarado"),
     "V22": ("profile", "toda cita resuelve a un documento del bundle"),
     "V23": ("profile", "el `resumen` sigue describiendo el cuerpo (`resumen_hash`)"),
+    "V24": ("profile", "el intervalo de vigencia es coherente"),
     "V26": ("profile", "las líneas de un log con formato declarado lo cumplen"),
     "V27": ("profile", "la clave de un tipo no la repiten dos documentos"),
 }
@@ -250,6 +251,7 @@ class Validator:
             self.check_derived()
             self.check_generated()
             self.check_unique_keys()
+            self.check_validity()
         return sorted(
             self.findings,
             key=lambda f: (SEVERITY_ORDER[f.severity], f.check, f.path, f.line),
@@ -507,6 +509,53 @@ class Validator:
                          f"`{name}`: no existe ningún {target_type} con "
                          f"{key_field} = `{value}`",
                          severity=WARNING)
+
+    def check_validity(self) -> None:
+        """El intervalo de vigencia, comprobado como lo que es: un intervalo.
+
+        Los tres estados que antes eran valores de enum ahora son consultas
+        sobre estas dos fechas, así que lo que hay que vigilar ya no es que un
+        enum concuerde con un enlace, sino que el intervalo tenga sentido. Tres
+        formas de no tenerlo, y cada una miente de una manera distinta:
+        """
+        model = self.contract.data.get("validity_model", {})
+        tipos = set(model.get("applies_to", []))
+        if not tipos:
+            return
+        sucesores: Dict[str, str] = {}
+        for doc in self.docs:
+            if doc.type not in tipos:
+                continue
+            desde = str(doc.meta.get("valido_desde") or "").strip()
+            hasta = str(doc.meta.get("valido_hasta") or "").strip()
+            sucesor = str(doc.meta.get("reemplazada_por") or "").strip()
+
+            # 1. Un intervalo que acaba antes de empezar no es un intervalo.
+            if desde and hasta and DATE_RE.match(desde) and DATE_RE.match(hasta) \
+                    and hasta < desde:
+                self.add("V24", doc.rel,
+                         f"`valido_hasta` ({hasta}) es anterior a `valido_desde` "
+                         f"({desde}): el intervalo acaba antes de empezar")
+
+            # 2. Sustituido pero sin dejar de regir: las dos cosas a la vez son
+            #    imposibles, y la consulta de «vigente» lo contaría como vigente.
+            if sucesor and not hasta:
+                self.add("V24", doc.rel,
+                         "declara `reemplazada_por` sin `valido_hasta`: algo que "
+                         "fue sustituido dejó de regir en alguna fecha, y sin ella "
+                         "sigue contando como vigente")
+            if sucesor:
+                sucesores[doc.rel] = sucesor.lstrip("/")
+
+        # 3. Dos documentos que se declaran sucesores el uno del otro: la
+        #    genealogía es un orden, no un círculo, y ninguna consulta de
+        #    supersesión termina sobre un ciclo.
+        for rel, sucesor in sorted(sucesores.items()):
+            if sucesores.get(sucesor, "").lstrip("/") == rel:
+                self.add("V24", rel,
+                         f"se declara sustituido por {sucesor}, que a su vez se "
+                         f"declara sustituido por este: la supersesión es un "
+                         f"orden, no un círculo")
 
     def check_resumen(self, doc: Document) -> None:
         """El `resumen` es el nivel que permite DESCARTAR un documento sin abrirlo.

@@ -633,6 +633,9 @@ def check_projection(contract) -> List[str]:
         # T7: el índice de texto, en la misma pasada que la proyección.
         problems += _check_search(local, bundle, db)
 
+        # T9: el modelo de vigencia, sobre datos escritos para eso.
+        problems += _check_validity(local, bundle, db)
+
         objetivo = bundle / "caso-reunion.md"
         objetivo.write_text(objetivo.read_text(encoding="utf-8")
                             .replace("title: ", "title: Reescrito "), encoding="utf-8")
@@ -670,6 +673,115 @@ def check_projection(contract) -> List[str]:
             problems.append("tras borrar, `--full` y la incremental difieren")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+    return problems
+
+
+def _cq_sql(cq: str) -> str:
+    """El `sql:` que declara una competency question, tal cual."""
+    yml = (ROOT / "kernel" / "tests" / "competency-questions.yml").read_text(encoding="utf-8")
+    i = yml.index(f"  - id: {cq}\n")
+    bloque = yml[i:yml.index("\n  - id: ", i + 1)]
+    m = re.search(r"^(\s*)sql: >-\n((?:\1[ ]+\S.*\n)+)", bloque, re.M)
+    return " ".join(l.strip() for l in m.group(2).splitlines()) if m else ""
+
+
+def _check_validity(contract, bundle, db_path) -> List[str]:
+    """T9: el intervalo manda, y CQ-48 y CQ-51 lo demuestran sobre los dos tipos.
+
+    Se escriben a mano una cadena de tres decisiones y una regla que caducó sin
+    sucesor, porque es el caso que ningún modelo derivado de `reemplazada_por`
+    sabe expresar -- sin sucesor no hay fecha de cierre y la regla figura
+    vigente para siempre. Si la proyección no lo distingue, T9 no sirve de nada.
+    """
+    import sqlite3
+    model = contract.data.get("validity_model", {})
+    if not model.get("view"):
+        return ["el contrato no declara la vista de vigencia"]
+    problems = []
+
+    def escribir(nombre, tipo, campos, extra=""):
+        cuerpo = fill(brain.render_template(contract, tipo), contract, tipo)
+        cuerpo = re.sub(r"(?m)^(valido_desde|valido_hasta|reemplazada_por|estado): .*\n",
+                        "", cuerpo)
+        frente, resto = cuerpo.split("---", 2)[1], cuerpo.split("---", 2)[2]
+        (bundle / nombre).write_text(
+            "---" + frente + campos + "---" + resto + extra, encoding="utf-8")
+
+    escribir("v-uno.md", "Decision",
+             "estado: aceptada\nvalido_desde: 2026-01-01\nvalido_hasta: 2026-04-01\n"
+             "reemplazada_por: /v-dos.md\n")
+    escribir("v-dos.md", "Decision",
+             "estado: aceptada\nvalido_desde: 2026-04-01\nvalido_hasta: 2026-07-01\n"
+             "reemplazada_por: /v-tres.md\n")
+    escribir("v-tres.md", "Decision", "estado: aceptada\nvalido_desde: 2026-07-01\n")
+    escribir("v-caducada.md", "Lineamiento",
+             "estado: vigente\nvalido_desde: 2025-01-01\nvalido_hasta: 2026-03-01\n")
+    brain.project(contract, bundle, db_path, full=True)
+    db = sqlite3.connect(db_path)
+
+    # Criterio 1 y 3: cada pregunta, con su propio SQL, sobre los dos tipos.
+    vigentes = db.execute(_cq_sql("CQ-48"), {"fecha": "2026-05-15"}).fetchall()
+    titulos = {r[2] for r in vigentes}
+    if "v-dos.md" not in titulos:
+        problems.append("CQ-48 no devuelve la decisión que regía en la fecha dada")
+    if "v-uno.md" in titulos or "v-tres.md" in titulos:
+        problems.append("CQ-48 devuelve documentos fuera del intervalo consultado")
+    if "v-caducada.md" in titulos:
+        problems.append("CQ-48 devuelve una regla que ya había caducado")
+
+    caducadas = {r[2] for r in db.execute(_cq_sql("CQ-51"), {"hoy": "2026-09-14"})}
+    if "v-caducada.md" not in caducadas:
+        problems.append("CQ-51 no encuentra la regla que caducó sin sucesor -- "
+                        "que es el caso entero por el que el intervalo se declara")
+    if caducadas & {"v-uno.md", "v-dos.md"}:
+        problems.append("CQ-51 cuenta como caducada una decisión que sí fue reemplazada")
+    tipos = {r[0] for r in vigentes} | {
+        r[0] for r in db.execute(_cq_sql("CQ-51"), {"hoy": "2026-09-14"})}
+    if not {"Decision", "Lineamiento"} <= tipos:
+        problems.append("la vigencia no se responde sobre los dos tipos, solo sobre "
+                        + ", ".join(sorted(tipos)))
+
+    # Criterio 2: la cadena de tres, contigua y sin solape.
+    # Solo la cadena escrita aquí: el cerebro de prueba lleva además un
+    # `caso-decision.md` por tipo, que no forma parte de ninguna cadena.
+    cadena = db.execute(
+        'select "valido_desde", "valido_hasta" from "vigencia" '
+        'where "tipo" = ? and "doc" like \'v-%\' order by "valido_desde"',
+        ("Decision",)).fetchall()
+    if len(cadena) != 3:
+        problems.append(f"la cadena de decisiones tiene {len(cadena)} eslabones, no 3")
+    elif any(a[1] != b[0] for a, b in zip(cadena, cadena[1:])):
+        problems.append("los intervalos de la cadena no son contiguos: hay hueco o solape")
+    db.close()
+
+    # Criterio 4: V24 se ejercita por su camino negativo. Comprobar que el
+    # check existe mirando `CHECKS` no diría nada -- V14 estuvo declarado y
+    # muerto un corte entero. Se rompe el intervalo de tres maneras y se exige
+    # que las nombre.
+    escribir("v-rota.md", "Decision",
+             "estado: aceptada\nvalido_desde: 2026-05-01\nvalido_hasta: 2026-01-01\n")
+    escribir("v-suelta.md", "Decision",
+             "estado: aceptada\nvalido_desde: 2026-01-01\n"
+             "reemplazada_por: /v-tres.md\n")
+    escribir("v-ciclo-a.md", "Decision",
+             "estado: aceptada\nvalido_desde: 2026-01-01\nvalido_hasta: 2026-06-01\n"
+             "reemplazada_por: /v-ciclo-b.md\n")
+    escribir("v-ciclo-b.md", "Decision",
+             "estado: aceptada\nvalido_desde: 2026-06-01\nvalido_hasta: 2026-09-01\n"
+             "reemplazada_por: /v-ciclo-a.md\n")
+    hallazgos = [f for f in brain.Validator(contract, bundle).run() if f.check == "V24"]
+    for archivo, senal in (("v-rota.md", "acaba antes de empezar"),
+                           ("v-suelta.md", "sigue contando como vigente"),
+                           ("v-ciclo-a.md", "no un círculo")):
+        if not any(f.path == archivo and senal in f.message for f in hallazgos):
+            problems.append(f"V24 no marca `{archivo}`: el intervalo puede romperse "
+                            f"de esa manera sin que nadie avise")
+    for nombre in ("v-rota.md", "v-suelta.md", "v-ciclo-a.md", "v-ciclo-b.md"):
+        (bundle / nombre).unlink()
+
+    for nombre in ("v-uno.md", "v-dos.md", "v-tres.md", "v-caducada.md"):
+        (bundle / nombre).unlink()
+    brain.project(contract, bundle, db_path, full=True)
     return problems
 
 

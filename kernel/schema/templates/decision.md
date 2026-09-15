@@ -10,7 +10,7 @@ resumen: "<panorama en ~600 caracteres: qué dice este documento y qué decide q
 resumen_hash: <sha256 del cuerpo, que imprime `./brain hash ARCHIVO --body` (o lo escribe `--write`)>
 procedencia: fuente          # fuente | dialogo | inferido | manual | derivado
 proyecto: transversal
-estado: propuesta          # propuesta | aceptada | reemplazada | obsoleta
+estado: propuesta          # propuesta | aceptada
 fecha: <YYYY-MM-DD>
 ---
 
