@@ -78,6 +78,20 @@ no está en el cerebro.
   quitarle la decisión sin avisarle.
 - **Distinguir lo verificado de lo generado.** Un documento sin entrada `verified` de un actor
   `human:` es una propuesta, no conocimiento. Si la respuesta se apoya en uno, decirlo.
+- **Y distinguir cómo entró cada cosa, que es otro eje.** `verified` dice **quién lo confirmó**;
+  `procedencia` dice **cómo entró**. Un agente transcribiendo un PDF y un agente infiriendo de una
+  discusión son el mismo actor con fiabilidad distinta, y `generated` no los separa.
+
+  **Nunca mezcles en una misma lista, sin marca, lo leído de una fuente y lo inferido que nadie ha
+  verificado.** Si la respuesta combina las dos cosas:
+
+  | Lo que responde | Cómo se presenta |
+  |---|---|
+  | `procedencia: fuente` o `dialogo`, o con `verified` de una persona | Se afirma, con su cita |
+  | `procedencia: inferido` **sin** `verified` humano | Se marca: «esto lo dedujo un agente y nadie lo ha confirmado» |
+
+  Una vez mezcladas, ninguna revisión posterior las separa — la señal que las distinguía no se
+  guardó en la respuesta. Es ADV-14, y es el motivo por el que `procedencia` existe.
 - **Si la base no responde**, decirlo y ofrecer abrir la pregunta con el responsable probable
   según las fichas y el organigrama:
   ```bash

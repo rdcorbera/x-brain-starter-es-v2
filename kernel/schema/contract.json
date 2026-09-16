@@ -256,7 +256,13 @@
       "values": ["fuente", "dialogo", "inferido", "manual", "derivado"],
       "required": true,
       "hint": "cómo entró la afirmación: leída de un insumo, dicha en una conversación, inferida por un agente, escrita por una persona, o derivada mecánicamente",
-      "note": "How the assertion ENTERED, which `actors` does not answer: it says WHO wrote the document. An agent transcribing a PDF and an agent inferring from a discussion are the same actor with different reliability, and today the system stores them identically -- CQ-52. Named `procedencia` and not `origen` because that key is already taken twice with two different data types (`Iniciativa.origen` is an enum, `Insumo.origen` a /raw/ link) and `derived_files.GOALS.md` groups by it. `derivado` is the fifth value and was not in the original four: generated indexes assert nothing of their own, and calling them `inferido` would poison the very distinction this field exists to draw -- inference is fallible, a derived index is deterministic."
+      "note": "How the assertion ENTERED, which `actors` does not answer: it says WHO wrote the document. An agent transcribing a PDF and an agent inferring from a discussion are the same actor with different reliability, and today the system stores them identically -- CQ-52. Named `procedencia` and not `origen` because that key is already taken twice with two different data types (`Iniciativa.origen` is an enum, `Insumo.origen` a /raw/ link) and `derived_files.GOALS.md` groups by it. `derivado` is the fifth value and was not in the original four: generated indexes assert nothing of their own, and calling them `inferido` would poison the very distinction this field exists to draw -- inference is fallible, a derived index is deterministic.",
+      "source_rule": {
+        "value": "fuente",
+        "satisfied_by": ["sources", "Insumo.origen"],
+        "severity": "warning",
+        "note": "Saying `fuente` is claiming the statement was READ somewhere, so the document has to say where -- otherwise the most trustworthy value is also the cheapest to write, which is backwards. V25 enforces it. `Insumo.origen` counts as much as `sources`: the converter writes the /raw/ pointer there, and demanding the same path twice in two fields would only create two places to disagree. A warning while the corpus migrates -- the field was born on 2026-09-11 and the 301 documents predate it -- and it tightens to error after the step-9 migration, exactly as `classification` does."
+      }
     },
     "timestamp": {
       "data_type": "datetime",

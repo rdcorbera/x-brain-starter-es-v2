@@ -1,4 +1,4 @@
-"""Validar: los 26 checks, en dos niveles.
+"""Validar: los 27 checks, en dos niveles.
 
 OKF comprueba la conformidad con la spec, que es deliberadamente permisiva;
 perfil comprueba lo nuestro, que puede endurecerse sin romper aquella."""
@@ -71,6 +71,7 @@ CHECKS = {
     "V22": ("profile", "toda cita resuelve a un documento del bundle"),
     "V23": ("profile", "el `resumen` sigue describiendo el cuerpo (`resumen_hash`)"),
     "V24": ("profile", "el intervalo de vigencia es coherente"),
+    "V25": ("profile", "`procedencia: fuente` declara de qué fuente"),
     "V26": ("profile", "las líneas de un log con formato declarado lo cumplen"),
     "V27": ("profile", "la clave de un tipo no la repiten dos documentos"),
 }
@@ -364,6 +365,7 @@ class Validator:
         self.check_classification(doc, type_name)
         self.check_stewardship(doc, type_name)
         self.check_resumen(doc)
+        self.check_procedencia(doc, type_name)
         self.check_placeholders(doc)
         self.check_links(doc)
 
@@ -509,6 +511,38 @@ class Validator:
                          f"`{name}`: no existe ningún {target_type} con "
                          f"{key_field} = `{value}`",
                          severity=WARNING)
+
+    def check_procedencia(self, doc: Document, type_name: str) -> None:
+        """Quien dice que lo leyó, dice dónde.
+
+        `procedencia: fuente` afirma que esto se leyó en alguna parte. Sin
+        decir en cuál, el valor más fiable del enum sería también el más barato
+        de escribir -- y sería el que un agente elige por defecto justo cuando
+        menos debería.
+
+        Qué cuenta como fuente lo dice el contrato, no este código:
+        `Insumo.origen` vale tanto como `sources`, porque ahí es donde el
+        conversor deja el puntero a `/raw/` y exigir la misma ruta dos veces
+        solo crearía dos sitios donde discrepar.
+        """
+        regla = self.contract.common.get("procedencia", {}).get("source_rule", {})
+        if not regla or doc.meta.get("procedencia") != regla.get("value"):
+            return
+        campos = self.contract.fields_for(type_name)
+        for nombre in regla.get("satisfied_by", []):
+            tipo, _, campo = nombre.rpartition(".")
+            if tipo and tipo != type_name:
+                continue          # `Insumo.origen` solo cuenta en un Insumo
+            if campo not in campos:
+                continue
+            valor = doc.meta.get(campo)
+            if valor not in (None, "", [], {}):
+                return
+        self.add("V25", doc.rel,
+                 f"`procedencia: {regla.get('value')}` afirma que esto se leyó "
+                 f"de algún sitio, y no dice de cuál: declara la fuente en "
+                 f"`{regla.get('satisfied_by', ['sources'])[0]}`",
+                 severity=regla.get("severity", WARNING))
 
     def check_validity(self) -> None:
         """El intervalo de vigencia, comprobado como lo que es: un intervalo.

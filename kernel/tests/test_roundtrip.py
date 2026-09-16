@@ -944,8 +944,11 @@ def _check_validity(contract, bundle, db_path) -> List[str]:
 
     def escribir(nombre, tipo, campos, extra=""):
         cuerpo = fill(brain.render_template(contract, tipo), contract, tipo)
-        cuerpo = re.sub(r"(?m)^(valido_desde|valido_hasta|reemplazada_por|estado): .*\n",
-                        "", cuerpo)
+        # Se quitan las claves que `campos` redefine -- todas, no una lista
+        # fija: con una lista fija, añadir un campo nuevo a una prueba lo deja
+        # duplicado en el frontmatter y el documento queda ambiguo en silencio.
+        redefinidas = [l.split(":", 1)[0] for l in campos.splitlines() if ":" in l]
+        cuerpo = re.sub(r"(?m)^(" + "|".join(redefinidas) + r"): .*\n", "", cuerpo)
         frente, resto = cuerpo.split("---", 2)[1], cuerpo.split("---", 2)[2]
         (bundle / nombre).write_text(
             "---" + frente + campos + "---" + resto + extra, encoding="utf-8")
@@ -1012,7 +1015,18 @@ def _check_validity(contract, bundle, db_path) -> List[str]:
     escribir("v-ciclo-b.md", "Decision",
              "estado: aceptada\nvalido_desde: 2026-06-01\nvalido_hasta: 2026-09-01\n"
              "reemplazada_por: /v-ciclo-a.md\n")
-    hallazgos = [f for f in brain.Validator(contract, bundle).run() if f.check == "V24"]
+    # V25 se ejercita aquí mismo, y por la misma razón que V24: un check que
+    # nadie rompe a propósito es un check del que solo se sabe que existe.
+    escribir("v-sin-fuente.md", "Lineamiento",
+             "estado: aprobado\nprocedencia: fuente\n")
+    todos = brain.Validator(contract, bundle).run()
+    if not any(f.check == "V25" and f.path == "v-sin-fuente.md" for f in todos):
+        problems.append("V25 no marca un `procedencia: fuente` que no declara "
+                        "ninguna fuente: el valor más fiable del enum sería el "
+                        "más barato de escribir")
+    (bundle / "v-sin-fuente.md").unlink()
+
+    hallazgos = [f for f in todos if f.check == "V24"]
     for archivo, senal in (("v-rota.md", "acaba antes de empezar"),
                            ("v-suelta.md", "sigue contando como vigente"),
                            ("v-ciclo-a.md", "no un círculo")):

@@ -230,6 +230,11 @@ La política que no se ejecuta no es un control. Estas son ejecutables.
   si se dijo en una reunión, `inferido` si la dedujo un agente, `manual` si la escribió una
   persona, `derivado` si la computó el generador. Un agente transcribiendo un PDF y un agente
   infiriendo de una discusión son el mismo actor con fiabilidad distinta.
+  **Decir `fuente` es afirmar que esto se leyó en algún sitio, así que hay que decir en cuál** —
+  en `sources`, o en `origen` si es un `Insumo`. Lo comprueba **V25**; sin él, el valor más fiable
+  del enum sería también el más barato de escribir. Y al responder, **lo `inferido` que nadie ha
+  verificado no va en la misma lista que lo leído sin decirlo**: mezclarlos pierde la señal que
+  los distinguía, y ninguna revisión posterior la recupera.
 
 **Lo que ninguna comprobación puede saber va en `cerebro/PERFIL.md`:** qué nombres, qué
 sistemas o qué asuntos no entran en este cerebro. Y por encima de todo — **nunca almacenes
@@ -309,7 +314,7 @@ x-brain/
 │   │   │   ├── const.py          ←   el vocabulario compartido
 │   │   │   ├── parse.py          ←   LEER: OKF-YAML, documentos, contrato, moldes
 │   │   │   ├── generate.py       ←   ESCRIBIR: plantillas, índices, derivados, stubs, DDL
-│   │   │   ├── validate.py       ←   COMPROBAR: los 26 checks, en dos niveles
+│   │   │   ├── validate.py       ←   COMPROBAR: los 27 checks, en dos niveles
 │   │   │   ├── report.py         ←   RENDIR: lo que los otros tres encontraron
 │   │   │   └── project.py        ←   PROYECTAR: el cerebro a una base SQLite
 │   │   ├── to-markdown.py         ← insumos binarios → markdown (cero tokens)
