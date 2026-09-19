@@ -94,25 +94,30 @@ reabras decisiones ya cerradas sin consultar la bitácora.
 
 | Archivo | Qué es | Cuándo leerlo |
 |---|---|---|
-| `tmp/ESTADO-Y-PRUEBAS.md` | **Lo primero que hay que leer ahora.** El estado exacto de lo construido, qué NO existe, cómo montar el entorno de pruebas y qué probar por orden de valor. La implementación está detenida a propósito | **Al retomar, antes que nada** |
-| `tmp/PLAN.md` | **El plan vigente.** Diagnóstico de las dos pendientes, los 10 pasos con su estado, riesgos y preguntas abiertas | Siempre, al retomar. Si algo lo contradice, manda este |
+| `tmp/ESTADO-Y-PRUEBAS.md` | **El encargo de pruebas, reescrito el 2026-09-19.** El estado exacto de lo construido —corte 1 y 2 completos—, qué NO existe, cómo montar el entorno y qué probar por orden de valor. **La prueba de punta a punta sigue sin hacerse** | **Al retomar, después de `PLAN.md`** |
+| `tmp/PLAN.md` | **El plan vigente.** Empieza por «Dónde estamos» y «Qué sigue». Diagnóstico de las dos pendientes, los 10 pasos con su estado, riesgos y preguntas abiertas —incluida la **deuda del contrato, que es lo único que se encarece con el tiempo** | **Lo primero, siempre.** Si algo lo contradice, manda este |
 | `tmp/BITACORA.md` | Las decisiones cerradas con su razón y lo que se descartó | Antes de reabrir cualquier decisión de diseño |
 | `tmp/inventario-reglas-v1.md` | Regla por regla de la prosa de v1, con su veredicto: sustituida, reducida o sobrevive | Al escribir o revisar prosa del kernel, y al construir los módulos |
 | `tmp/plan-implementacion-x-brain-v2.md` | Propuesta del equipo. **Insumo, no plan** | Al retomar la proyección, hechos atómicos o capa semántica (cortes 2–3). Ojo: propone DuckDB, **descartado como motor** — la proyección se hace sobre SQLite |
-| `tmp/plan-agent-zero-x-brain-v2.md` | **Plan de implementación vigente (rev. 8)**: las ideas del paper Agent Zero llevadas a tareas con criterio de aceptación, contrastadas contra el contrato real. **Gobierna la implementación**; sus siete decisiones están cerradas | Antes de tocar el contrato, el corte 2 o la migración del paso 9 |
+| `tmp/plan-agent-zero-x-brain-v2.md` | El plan de implementación: las ideas del paper Agent Zero llevadas a tareas con criterio de aceptación. **Sus 13 tareas están cerradas** (T4–T11 entre el 13 y el 17 de septiembre); cada una conserva su enunciado original junto a lo que se entregó y lo que salió al construirla | Antes de tocar el contrato o la proyección: dice por qué cada cosa está como está |
 | `tmp/competency-questions-research.md` | La revisión de literatura de la que salen las 24 CQs | Antes de tocar `competency-questions.yml`, o al discutir si un tipo se sostiene |
 | `tmp/encargo-competency-questions.md` | El encargo con el que se pidieron las 24 CQs. **Formato de referencia** para cualquier encargo nuevo | Al escribir un encargo de investigación |
 | `tmp/encargo-memoria-largo-plazo.md` | **RETIRADO el 2026-09-11.** No se mandan más encargos al equipo de investigación externo. Se conserva como registro; lo que pedía y no estaba respondido —el olvido y la capa de hechos— vive ahora en las preguntas abiertas de `tmp/PLAN.md` | Solo como registro histórico |
-| `tmp/cerebro-survey.json` | La medición del cerebro real: 301 documentos, veredicto A/B, tipos, salud del frontmatter | Al dimensionar la migración (paso 9) |
-| `tmp/sqlite-results.json` | La sonda en la máquina de destino: SQLite 3.50.4, las 8 capacidades en verde. **El veredicto vigente es `viable: true`**, medido fuera de OneDrive; el JSON guardado es el de la primera corrida —con el cerebro aún dentro de OneDrive— y por eso dice `viable: false`. Volcar el de la corrida buena | Al arrancar el corte 2 |
+| `tmp/cerebro-survey.json` | La medición del cerebro real: 301 documentos, veredicto A/B, tipos, salud del frontmatter | Registro histórico: **la migración se canceló**. Sirve para el diagnóstico, no para planificar |
+| `tmp/sqlite-results.json` | La sonda en la máquina de destino: SQLite 3.50.4, las 8 capacidades en verde. **El veredicto vigente es `viable: true`**, medido fuera de OneDrive; el JSON guardado es el de la primera corrida —con el cerebro aún dentro de OneDrive— y por eso dice `viable: false`. Volcar el de la corrida buena | Ya no bloquea nada: el corte 2 está construido y corre |
 | `tmp/rediseño second brain primera investigacion.md` | Búsqueda agéntica, grafos ligeros, OKF v0.2, progressive disclosure | Al evaluar recuperación a escala |
 | `tmp/rediseño second brain segunda investigacion.md` | Paradigmas alternativos y veredicto sobre Markdown-en-Git como fuente de verdad | Antes de reconsiderar la fuente de verdad |
 
 ### Cómo retomar
 
-1. **Lee `tmp/PLAN.md`** — la tabla de pasos dice qué está hecho y qué no, y cada paso
-   pendiente tiene su sección «Punto de partida», que es por dónde empezar.
-2. **Comprueba que todo sigue en verde** antes de tocar nada:
+**Estado a 2026-09-19: corte 1 y corte 2 completos, y lo siguiente no es construir sino
+probar.** Las 13 tareas del plan de implementación están cerradas. La implementación se detuvo el
+2026-09-11 para probar de punta a punta, **no se probó**, y se construyó el corte 2 encima.
+
+1. **Lee `tmp/PLAN.md`** — empieza por el recuadro «Dónde estamos» y por «Qué sigue», que traen
+   el estado y el orden recomendado. La tabla de pasos dice qué está hecho y qué no.
+2. **Luego `tmp/ESTADO-Y-PRUEBAS.md`**, que es el encargo de la prueba y está al día.
+3. **Comprueba que todo sigue en verde** antes de tocar nada:
    ```bash
    ./brain kernel/tests/test_roundtrip.py   # el contrato es consistente consigo mismo
    ./brain generate                         # los artefactos generados, al día
@@ -122,7 +127,23 @@ reabras decisiones ya cerradas sin consultar la bitácora.
    ```
    El `git diff` va **acotado a lo generado**, no al árbol entero: mientras haya trabajo sin
    commitear, un `--exit-code` a secas falla siempre y deja de informar.
-3. **Revisa `kernel/CHANGELOG.md` de v1** — avanza mientras construimos.
+
+   El round-trip es ahora bastante más que un round-trip: además del contrato comprueba que el
+   DDL lo acepta SQLite y deriva del contrato, que la proyección incremental dice lo mismo que
+   `--full`, que el presupuesto de lectura no se bifurca, y que **las 42 competency questions
+   corren** —las adversariales al revés, y cada una tiene que ver su propio defecto—.
+4. **Revisa `kernel/CHANGELOG.md` de v1** — avanza mientras construimos.
+
+### Una lección de estas dos semanas, que conviene no reaprender
+
+**Cinco veces seguidas se escribió un control que no controlaba**, cada vez de una forma distinta:
+la referencia salía de lo controlado (T6), la observación pasaba por un join que tapaba el fallo
+(T7), el check no se ejercitaba en ninguna parte (T9, y antes V14 un corte entero), la consulta no
+tenía datos que pudieran dispararla (T8), y se comprobaba que algo aparece sin comprobar que lo
+contrario desaparece (T10).
+
+**Un control se termina cuando se le ha visto fallar.** Si al escribir una comprobación no se
+rompe a propósito lo que vigila, no se sabe si vigila — y las cinco veces el test estaba en verde.
 
 ## Preguntas abiertas
 
