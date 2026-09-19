@@ -128,8 +128,14 @@ reabras decisiones ya cerradas sin consultar la bitácora.
 
 Viven en `tmp/PLAN.md`, junto a los riesgos. Las que bloquean trabajo hoy:
 
-- La **taxonomía de clasificación** es una propuesta nuestra: validarla con gobierno de datos
-  **antes** de clasificar el corpus, porque si la rechazan después hay que reclasificar todo.
+- ~~La **taxonomía de clasificación** es una propuesta nuestra~~ **Cerrado el 2026-09-16:** los
+  cuatro niveles y los mínimos por tipo quedan como están y pasan a ser la taxonomía del sistema.
+- **v2 no es retrocompatible con v1, y no habrá migración** *(decidido el 2026-09-16)*. Un cerebro
+  de v1 no se convierte: su conocimiento se vuelve a cargar por `/x-procesar-inbox` o
+  reconstruyéndolo desde `raw/`. **Consecuencia que conviene tener presente al tocar el kernel:**
+  todo lo que el contrato conserva «por coste de migración» —los nombres con guion, `type-key`
+  frente a enlaces, las tres formas de `periodo` sin declarar, las severidades relajadas «mientras
+  el corpus migra»— se quedó sin ese argumento y vuelve a ser discutible por sus méritos.
 - ~~**`Decision` tiene cero documentos en el cerebro real** (R8)~~ **Cerrado el 2026-09-12.** El
   vacío se atribuye al **nivel de pruebas de v1**, escaso o nulo, no al diseño del tipo: v1 nunca
   ejercitó una ingesta verificando qué tipos debía producir. Lo que sustituye a la encuesta a los

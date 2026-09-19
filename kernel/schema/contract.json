@@ -78,6 +78,26 @@
     "default": "error"
   },
 
+  "read_budget": {
+    "note": "The read side, in three levels. L0 is `description` and L1 is `resumen`; both are projected as columns, so orienting costs one query and never opens a file. The point is not the cap: `survey.py` measured the 65.016-token baseline as «open 5 documents», so a cap of 5 restricts nothing. The saving comes from L0 and L1 letting the reader open FEWER. The cap is the guard rail, not the mechanism.",
+    "levels": {
+      "L0": { "field": "description", "purpose": "una frase: descartar de un vistazo" },
+      "L1": { "field": "resumen", "purpose": "~600 caracteres: descartar SIN abrir el documento" },
+      "L2": { "field": "cuerpo", "purpose": "el documento entero; es lo que cuesta" }
+    },
+    "l1_target_chars": 600,
+    "default_body_cap": 5,
+    "cap_note": "Deliberately NOT binding yet. A cap that bites hides how many documents the query would have needed, so the real distribution could never be observed. CQ-46 measures `citados / completos` -- the share of full opens that actually supported a claim -- and the cap gets set from that measurement, not from an estimate. NOTE (2026-09-17): the baseline was going to come from the migrated production corpus, and the migration was cancelled. It now builds up from ordinary use instead: slower, equally valid, and the cap stays at 5 until there is data.",
+    "agent_rules_es": [
+      "Lista primero los L0 de los candidatos. No abras nada todavía.",
+      "Abre el L1 solo de los candidatos que el L0 no descartó.",
+      "Abre el cuerpo completo (L2) de como máximo 5 documentos por consulta.",
+      "Si el tope no alcanza, DILO en la respuesta y nombra qué quedó sin abrir. Nunca respondas como si hubieras leído lo que no abriste: esa es la mitad de la disciplina de cita que ningún validador puede ver.",
+      "Al cerrar, registra en `log-consultas.md` cuántos cuerpos abriste y cuántos acabaron sosteniendo una afirmación. Si abriste algo solo para descartarlo, dilo en la respuesta y cítalo; si no, cuenta como abierto de más."
+    ],
+    "enforced_by": "V26 comprueba la línea del log; el resto es conducta y vive en `kernel/modulos/consulta/consultar.md`. Lo que sí se comprueba mecánicamente es que el tope declarado aquí y el que ese módulo enseña sean el mismo número: si se bifurcan, el agente obedece al módulo y la instrumentación mide contra otro tope."
+  },
+
   "validity_model": {
     "note": "Which field answers «is this still true?». It is written here because the answer used to be spread across SIX mechanisms that nobody had listed side by side -- and the contract itself admitted one of them was redundant (`Lineamiento.vigencia`: «does the same job as `estado` elsewhere»). Six overlapping answers do not make a system stricter; they make it impossible to say which one is right when they disagree. T9 (2026-09-14) assigned one axis to each.",
     "principle": "ONE FACT, ONE PLACE. The interval is the only source of «did it rule?»; every other field answers a different question.",
@@ -187,8 +207,7 @@
       "values_from": "classification.levels",
       "default_from": "classification.default_min",
       "required": true,
-      "severity": "warning",
-      "note": "Sensitivity level. The allowed values are RESOLVED from the taxonomy at load time rather than repeated here -- writing the list twice in one file is exactly the drift this contract exists to prevent, and it had been written twice. Required, but only a warning in profile 1 because the production corpus does not carry it yet. Each type declares a `min_classification`; going below it is an error, not a warning. Replaces v1's prose rule (`no sensitive data`), which enforced nothing because it lived inside a template guide string."
+      "note": "Sensitivity level. The allowed values are RESOLVED from the taxonomy at load time rather than repeated here -- writing the list twice in one file is exactly the drift this contract exists to prevent, and it had been written twice. Required, and an ERROR since 2026-09-17: it was only a warning because the production corpus did not carry it, and on 2026-09-16 the migration was cancelled -- there is no corpus catching up any more, so a v2 brain is born with the field or it is not born. Every document that reaches a brain from now on passes through an agent that writes it. Each type declares a `min_classification`; going below it is an error, not a warning. Replaces v1's prose rule (`no sensitive data`), which enforced nothing because it lived inside a template guide string."
     },
 
     "generated": {
@@ -248,20 +267,22 @@
       "hint": "el nivel intermedio de lectura: lo que permite DESCARTAR un documento sin abrirlo",
       "note": "L1 of the read budget (`read_budget`). Deliberately AUTHORED, not mechanically extracted from headings: a table of contents does not let a reader discard a document and an overview does. This is the field that attacks the 95% -- survey.py measured 3.285 tokens to find candidates and 61.731 to open them, so orientation is where the cost is. Written by the agent at ingest under human review; the deterministic layer only ever writes a MECHANICAL one, for generated indexes, where the summary genuinely is mechanical. Its staleness check (V23, against `resumen_hash`) arrives with T2: until then the field exists and nothing guards it drifting from the body."
     },
-    "resumen_hash": { "data_type": "text", "required": true, "severity": "warning",
+    "resumen_hash": { "data_type": "text", "required": true,
                       "placeholder": "sha256 del cuerpo, que imprime `./brain hash ARCHIVO --body` (o lo escribe `--write`)",
-                      "note": "SHA-256 of the BODY at the moment the `resumen` was written, so V23 can say the summary went stale. Hashes the body and never the frontmatter, because the value lives in the frontmatter and hashing itself would change what it hashes -- that is exactly why `path`/`hash` of the projection are NOT common fields, and why this one legitimately is. Required but relaxed while the corpus migrates: 301 documents predate it. NEVER filled in by `validate --fix`: recomputing it would silence V23 without anyone having checked that the summary still describes the body, which is falsifying the guarantee rather than repairing it. It is written by whoever writes the summary, in the same breath." },
+                      "note": "SHA-256 of the BODY at the moment the `resumen` was written, so V23 can say the summary went stale. Hashes the body and never the frontmatter, because the value lives in the frontmatter and hashing itself would change what it hashes -- that is exactly why `path`/`hash` of the projection are NOT common fields, and why this one legitimately is. Required and an ERROR since 2026-09-17: the relaxation existed for the 301 documents that predated the field, and the migration that would have carried them was cancelled on 2026-09-16. ONE EXPECTED CONSEQUENCE, said out loud: a freshly converted `Insumo` has a placeholder summary and no hash, so it is an error until someone integrates it. That is the truth about that document, and `/x-procesar-inbox` is what resolves it in the same ritual. NEVER filled in by `validate --fix`: recomputing it would silence V23 without anyone having checked that the summary still describes the body, which is falsifying the guarantee rather than repairing it. It is written by whoever writes the summary, in the same breath." },
     "procedencia": {
       "data_type": "enum",
       "values": ["fuente", "dialogo", "inferido", "manual", "derivado"],
       "required": true,
+      "default": "manual",
+      "default_note": "The template proposes `manual` -- a person wrote this -- because it is the value that claims the least. `fuente` was the default until 2026-09-17, when V25 became an error and showed what that meant: the template was handing out the most trustworthy value, the one that obliges you to name a source, to every document by default. Whoever ingests from a source sets `fuente` AND writes the source; the converter already does both.",
       "hint": "cómo entró la afirmación: leída de un insumo, dicha en una conversación, inferida por un agente, escrita por una persona, o derivada mecánicamente",
       "note": "How the assertion ENTERED, which `actors` does not answer: it says WHO wrote the document. An agent transcribing a PDF and an agent inferring from a discussion are the same actor with different reliability, and today the system stores them identically -- CQ-52. Named `procedencia` and not `origen` because that key is already taken twice with two different data types (`Iniciativa.origen` is an enum, `Insumo.origen` a /raw/ link) and `derived_files.GOALS.md` groups by it. `derivado` is the fifth value and was not in the original four: generated indexes assert nothing of their own, and calling them `inferido` would poison the very distinction this field exists to draw -- inference is fallible, a derived index is deterministic.",
       "source_rule": {
         "value": "fuente",
         "satisfied_by": ["sources", "Insumo.origen"],
-        "severity": "warning",
-        "note": "Saying `fuente` is claiming the statement was READ somewhere, so the document has to say where -- otherwise the most trustworthy value is also the cheapest to write, which is backwards. V25 enforces it. `Insumo.origen` counts as much as `sources`: the converter writes the /raw/ pointer there, and demanding the same path twice in two fields would only create two places to disagree. A warning while the corpus migrates -- the field was born on 2026-09-11 and the 301 documents predate it -- and it tightens to error after the step-9 migration, exactly as `classification` does."
+        "severity": "error",
+        "note": "Saying `fuente` is claiming the statement was READ somewhere, so the document has to say where -- otherwise the most trustworthy value is also the cheapest to write, which is backwards. V25 enforces it. `Insumo.origen` counts as much as `sources`: the converter writes the /raw/ pointer there, and demanding the same path twice in two fields would only create two places to disagree. An ERROR since 2026-09-17. It shipped as a warning for the 301 documents that predated the field; the step-9 migration was cancelled on 2026-09-16, so there is nothing left to wait for."
       }
     },
     "timestamp": {

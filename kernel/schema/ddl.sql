@@ -10,13 +10,13 @@ CREATE TABLE "documentos" (
   "type" TEXT NOT NULL,
   "title" TEXT NOT NULL,
   "description" TEXT NOT NULL,
-  "classification" TEXT CHECK ("classification" IN ('public', 'internal', 'confidential', 'restricted')),
+  "classification" TEXT NOT NULL CHECK ("classification" IN ('public', 'internal', 'confidential', 'restricted')),
   "generated_by" TEXT,
   "generated_at" TEXT,
   "status" TEXT CHECK ("status" IN ('draft', 'stable', 'deprecated')),
   "stale_after" TEXT,
   "resumen" TEXT NOT NULL,
-  "resumen_hash" TEXT,
+  "resumen_hash" TEXT NOT NULL,
   "procedencia" TEXT NOT NULL CHECK ("procedencia" IN ('fuente', 'dialogo', 'inferido', 'manual', 'derivado'))
 ) STRICT;
 

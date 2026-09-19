@@ -75,7 +75,7 @@ Todo lo de la derecha es **generado**: no se edita, se regenera — y **V14 lo c
 
 La política que no se ejecuta no es un control. v1 tenía **más** reglas de gobierno que v2 —todas en prosa dentro de `AGENTS.md`— y ninguna aplicaba nada. v2 tiene menos, pero son ejecutables.
 
-**Clasificación.** Cuatro niveles —`public`, `internal`, `confidential`, `restricted`— y un **mínimo por tipo**. `Persona` no puede bajar de `confidential` porque contiene dato personal, e `Insumo` tampoco porque es material externo cuyo contenido el sistema no controla. La ausencia de clasificación es un aviso mientras el corpus migra; **estar por debajo del mínimo es siempre un error**, y es el único control que no se relaja durante la migración.
+**Clasificación.** Cuatro niveles —`public`, `internal`, `confidential`, `restricted`— y un **mínimo por tipo**. `Persona` no puede bajar de `confidential` porque contiene dato personal, e `Insumo` tampoco porque es material externo cuyo contenido el sistema no controla. **Faltar la clasificación es un error, y estar por debajo del mínimo también.** Fueron avisos mientras hubo un corpus de v1 que migrar; v2 no es retrocompatible y esa migración no existe, así que no queda nada esperando.
 
 **Responsabilidad.** `dueño`, `responsable` y `fuente` son `person-ref`: aceptan un enlace a una ficha `Persona` —que se verifica— o un nombre en texto libre, que se tolera y se reporta hasta resolverse. Así la propiedad se vuelve consultable de forma progresiva en vez de tras un muro de errores.
 

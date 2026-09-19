@@ -127,6 +127,11 @@ El `.md` resultante es un insumo más y sigue a la Fase 5.
 El catálogo vigente es `cerebro/ESQUEMA.md`.
 
 **Transcripción de reunión** (`.vtt` o texto) → una `Reunion`. Antes de integrarla se elabora un
+**Nota sobre el estado intermedio:** un insumo recién convertido lleva un `resumen` marcador y
+no lleva `resumen_hash`, así que `./brain validate` lo marca como **error** hasta que se integra.
+Es correcto y es el punto: ese documento todavía no dice lo que dice. La Fase que sigue lo
+resuelve, y el ritual no termina hasta que `validate` queda limpio.
+
 **resumen extenso y autocontenido**: participantes, temas, acuerdos, compromisos con fecha,
 decisiones, riesgos y datos nuevos. Ese resumen es el cuerpo de la nota; **la transcripción
 cruda no se copia al wiki, se cita**. Que se entienda sin abrir el `.vtt`.

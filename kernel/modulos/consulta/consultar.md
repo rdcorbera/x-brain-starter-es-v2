@@ -39,26 +39,71 @@ base, se dice. Es la misma regla de siempre, no una excepción.
 
 ---
 
-## Fase 1 — Buscar por los índices, nunca a ciegas
+## Fase 1 — Encontrar, y **abrir lo menos posible**
 
-**Barrer el cerebro entero es el gasto que este sistema existe para evitar.** El orden importa:
+**Barrer el cerebro entero es el gasto que este sistema existe para evitar.** Pero el gasto no
+está donde parece: encontrar cuesta el 5% de una consulta; **leer cuesta el 95%**. Por eso esta
+fase tiene dos mitades, y la segunda importa más.
 
-| Paso | Dónde | Para qué |
+### 1.1 Encontrar — con la proyección, si está
+
+```bash
+./brain project                                  # deja la base al día (barato: solo lo que cambió)
+./brain project --search "<término>"             # por texto: devuelve rutas y ranking, nunca contenido
+```
+
+Y para lo que no es texto libre, una consulta responde de una vez lo que navegar carpetas
+responde a trozos:
+
+| Lo que preguntas | Dónde mirar |
+|---|---|
+| Qué pasó en un proyecto entre dos fechas | vista `eventos` |
+| Qué decisión o lineamiento regía en una fecha | vista `vigencia` |
+| Qué caducó sin que nadie lo reemplazara | vista `vigencia`, estado `caducada` |
+| Todo lo de un proyecto, sea del tipo que sea | vista `documento_proyecto` |
+
+Las consultas exactas de cada pregunta frecuente están en `kernel/tests/competency-questions.yml`,
+en la clave `sql:` — **no las inventes si ya están escritas.**
+
+**Si no hay proyección** —no se ha corrido `project`, o este SQLite no trae FTS5— se navega por
+índices, que siguen estando y siguen valiendo: `cerebro/index.md` y los de las carpetas
+plausibles, `GOALS.md` y `PREGUNTAS-ABIERTAS.md` para lo que está en curso y lo que está sin
+responder, `04-archivo/` solo si la pregunta es histórica, y los `log.md` solo para «¿qué pasó en
+X las últimas semanas?».
+
+Los índices y los derivados son artefactos generados: si alguno se ve viejo, se regenera antes de
+sacar conclusiones de él —nunca se corrige a mano—, y si aun así falta, **eso es el hallazgo**: lo
+que no está escrito no está en el cerebro.
+
+### 1.2 Leer por niveles — el presupuesto
+
+Encontrar diez candidatos no autoriza a abrir diez documentos. Se baja un nivel cada vez, y solo
+para lo que el nivel anterior no descartó:
+
+| Nivel | Qué es | Cuándo se abre |
 |---|---|---|
-| 1 | `cerebro/index.md` y los `index.md` de las carpetas plausibles | Ubicar candidatos por título y descripción, sin abrirlos |
-| 2 | `cerebro/GOALS.md` y `cerebro/PREGUNTAS-ABIERTAS.md` | Lo que está en curso y lo que está sin responder, ya agregados |
-| 3 | Solo las páginas prometedoras | `CONTEXT.md`, decisiones, fichas de `Sistema` y `Persona`, lineamientos, reuniones |
-| 4 | `cerebro/04-archivo/` | Solo si la pregunta es histórica |
-| 5 | Los `log.md` | Solo para preguntas del tipo «¿qué pasó en X las últimas semanas?» |
+| **L0** | `description`, una frase | Siempre: es lo que devuelve la consulta, gratis |
+| **L1** | **`resumen`**, ~600 caracteres | Solo si el L0 no descartó el documento |
+| **L2** | El cuerpo entero | Solo si el L1 tampoco. **Máximo 5 por consulta** |
 
-Los índices y los derivados son artefactos generados: están al día porque `./brain index` y
-`./brain derive` los reescriben. Si alguno se ve viejo, se regenera antes de sacar conclusiones
-de él —no se corrige a mano—, y si aun así falta, **eso es el hallazgo**: lo que no está escrito
-no está en el cerebro.
+L0 y L1 son **columnas de la proyección**: orientarse cuesta una consulta y no abre un archivo.
 
-> **Hoy esto es navegación, y se sabe.** Encontrar los documentos relevantes entre N es la
-> Pendiente B del rediseño, y su sustituto —una proyección consultable— es el corte 2. Hasta
-> entonces se navega por índices, que es lo que los hace valer.
+```sql
+select path, type, title, description, resumen from documentos where …
+```
+
+**El tope no es lo que ahorra.** Cinco aperturas es exactamente lo que costaba una consulta antes
+de que existiera el nivel intermedio, así que el tope no recorta nada por sí solo: lo que ahorra
+es que el `resumen` permita abrir **menos de cinco**. El tope está ahí para que, cuando no
+alcance, la respuesta lo diga en vez de disimularlo.
+
+**Y si no alcanza, se dice.** Nombra qué quedó sin abrir. **Nunca respondas como si hubieras
+leído lo que no abriste** — es la mitad de la disciplina de cita que ningún validador puede ver,
+y la única defensa es que quien responde la cumpla.
+
+> Las reglas exactas, con su tope, están declaradas en **`read_budget.agent_rules_es`** del
+> contrato. Si este módulo y el contrato dijeran topes distintos, mandaría el contrato — y el
+> round-trip comprueba que no se bifurquen.
 
 ---
 

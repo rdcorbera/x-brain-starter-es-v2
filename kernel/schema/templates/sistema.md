@@ -8,7 +8,7 @@ classification: internal          # mínimo de Sistema: internal
 generated: {by: <by>, at: <at>}
 resumen: "<panorama en ~600 caracteres: qué dice este documento y qué decide quien lo lee>"
 resumen_hash: <sha256 del cuerpo, que imprime `./brain hash ARCHIVO --body` (o lo escribe `--write`)>
-procedencia: fuente          # fuente | dialogo | inferido | manual | derivado
+procedencia: manual          # fuente | dialogo | inferido | manual | derivado
 dueño: <enlace a la ficha de quien responde, o su nombre>
 categoria: sistema          # sistema | herramienta | producto | proceso
 estado: activo          # activo | en-cambio | deprecado

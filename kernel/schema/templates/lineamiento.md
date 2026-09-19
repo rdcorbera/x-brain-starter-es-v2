@@ -8,7 +8,7 @@ classification: internal          # mínimo de Lineamiento: internal
 generated: {by: <by>, at: <at>}
 resumen: "<panorama en ~600 caracteres: qué dice este documento y qué decide quien lo lee>"
 resumen_hash: <sha256 del cuerpo, que imprime `./brain hash ARCHIVO --body` (o lo escribe `--write`)>
-procedencia: fuente          # fuente | dialogo | inferido | manual | derivado
+procedencia: manual          # fuente | dialogo | inferido | manual | derivado
 area: <nombre del área en /02-areas/>
 fuente: <quién lo definió — enlace a ficha, comité o área>
 estado: aprobado          # aprobado | en-revision

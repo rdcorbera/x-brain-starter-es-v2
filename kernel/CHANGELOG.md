@@ -285,23 +285,35 @@ fallar. Desaparecen el `.venv`, el `requirements.txt` y el re-exec.
   promovió nada, se dice — es un resultado legítimo, pero tiene que ser una conclusión y no un
   silencio.
 
-### Migración desde un cerebro v1
+### Venir de v1: **no hay migración, y es deliberado**
 
-Los cerebros de v1 **no son conformes al perfil de v2** hasta migrarlos, pero siguen siendo
-OKF-válidos y legibles. El camino:
+**v2 no es retrocompatible con v1, y no existe una ruta de conversión.** No es que falte: se
+decidió no construirla.
 
-1. **Copia tu `cerebro/`, `raw/` y `plugins/`** a un clon del starter v2.
-2. **`./brain init cerebro`** — crea lo que falte sin tocar lo que exista.
-   Nunca sobrescribe un archivo que ya está.
-3. **`./brain validate cerebro`** — el informe de qué falta. Espera muchos hallazgos la primera
-   vez: la capa OKF v0.2 (`classification`, `generated`, `sources`, `status`) no existe en
-   ningún documento de v1.
-4. **`validate --fix`** — resuelve lo mecánico: índices, derivados y entrecomillado.
-5. **Lo que queda pide criterio**, y es sobre todo `classification`: es una decisión de
-   gobierno por documento y **no se puede autocompletar**. Por eso su ausencia es aviso y no
-   error mientras `profile_version` sea 1.
-6. **Los `Playbook` hay que triarlos a mano** para separar los `Analisis`. No es automatizable:
-   decidir cuál es cuál exige leerlos.
+**Por qué.** Migrar un cerebro de v1 exigía completar a mano la capa entera que v2 añade —
+`classification`, `resumen`, `procedencia`, el intervalo de vigencia— y hacerlo **sin haber
+leído** los documentos, que es justo la clase de trabajo que este sistema existe para no hacer. El
+renglón más caro eran los resúmenes: uno por documento, redactado y revisado, porque un resumen
+extraído mecánicamente no permite descartar nada. Y triar los `Playbook` para separar los
+`Analisis` tampoco es automatizable: decidir cuál es cuál exige leerlos.
 
-`timestamp`, el campo de v1 que OKF v0.2 reemplaza por `generated.at`, queda declarado como
-obsoleto y auto-migrable.
+**Qué hacer en su lugar.** El conocimiento vuelve a entrar por donde entra todo:
+
+1. **Copia `raw/` a tu clon de v2.** Los originales son inmutables y llevan su SHA-256 en
+   `raw/manifiesto.md`: `./brain verify-raw` comprueba que llegaron intactos.
+2. **`./brain init cerebro`** sobre un cerebro vacío.
+3. **Vuelve a ingerir con `/x-procesar-inbox`**, o reconstruye desde los originales. Cada
+   documento pasa por un agente que escribe su `resumen` y su `procedencia` en el momento en que
+   lo lee — que es cuando esos campos son baratos y ciertos.
+
+**Lo que se gana con esto**, y es la razón de fondo: el coste no desaparece, **se reparte**. Una
+migración concentra en una jornada un trabajo que la ingesta ordinaria absorbe documento a
+documento, y además lo hace en el único momento en que nadie tiene el contexto fresco.
+
+**El cerebro de v1 no se pierde ni se borra.** Sigue siendo OKF-válido y legible tal como está:
+cualquier herramienta que lea frontmatter lo abre, y sus originales siguen en `raw/`. Lo que no
+hace es cumplir el perfil de v2.
+
+> **Consecuencia para quien mantiene el kernel:** todo lo que el contrato conservaba «por coste
+> de migración» —los nombres de campo con guion, `type-key` en vez de enlaces, las tres formas de
+> `periodo` sin declarar— se quedó sin ese argumento. Vuelve a ser discutible por sus méritos.

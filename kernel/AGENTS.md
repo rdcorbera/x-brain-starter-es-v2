@@ -212,8 +212,9 @@ La política que no se ejecuta no es un control. Estas son ejecutables.
 - **Clasificación.** Cuatro niveles —`public`, `internal`, `confidential`, `restricted`— y un
   **mínimo por tipo**. `Persona` no baja de `confidential` porque contiene dato personal, e
   `Insumo` tampoco porque es material externo cuyo contenido el sistema no controla. La
-  *ausencia* de clasificación es un aviso mientras el corpus migra; **estar por debajo del
-  mínimo es siempre un error**, y es el único control que no se relaja.
+  **la ausencia de clasificación es un error**, igual que estar por debajo del mínimo. Fue un
+  aviso mientras existió un corpus que migrar; desde que se decidió que v2 no es retrocompatible,
+  no hay nada esperando: un documento entra en el cerebro con su nivel o no entra.
 - **Responsabilidad.** `dueño`, `responsable` y `fuente` aceptan un enlace a una ficha
   `Persona` —que se verifica— o un nombre en texto libre, que se tolera y se reporta hasta
   resolverse (V17).

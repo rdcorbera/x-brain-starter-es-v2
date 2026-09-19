@@ -753,8 +753,9 @@ def _base_de_prueba(contract):
     for path, tipo in (("d.md", "Decision"), ("pa.md", "Persona"),
                        ("pb.md", "Persona"), ("p.md", "Persona")):
         db.execute('insert into documentos ("path","hash","type","title",'
-                   '"description","resumen","procedencia","classification") '
-                   "values (?,?,?,'T','D','R','manual','confidential')",
+                   '"description","resumen","resumen_hash","procedencia",'
+                   '"classification") '
+                   "values (?,?,?,'T','D','R','h','manual','confidential')",
                    (path, "h", tipo))
     db.execute("insert into decision values "
                "('d.md','transversal','aceptada','2026-01-01',null,null,null)")
@@ -1159,6 +1160,55 @@ def _check_timeline(contract, db_path) -> List[str]:
     return problems
 
 
+def check_read_budget(contract) -> List[str]:
+    """T2: el presupuesto de lectura está declarado, y no se bifurca.
+
+    La regla que más importa —«si el tope no alcanza, dilo y nombra qué quedó
+    sin abrir»— es conducta y ningún test la ve. Lo que sí se puede comprobar,
+    y es donde estaba el riesgo real, es que **el número viva en un solo
+    sitio**: el módulo de consulta enseña un tope y el contrato declara otro, el
+    agente obedece al módulo, y la instrumentación de CQ-46 mide contra un tope
+    que nadie aplica. Un desacuerdo silencioso entre dos números que dicen ser
+    el mismo.
+    """
+    budget = contract.data.get("read_budget", {})
+    if not budget:
+        return ["el contrato no declara `read_budget`: el presupuesto de lectura "
+                "seguiría viviendo solo en la prosa de un skill"]
+    problems = []
+    for nivel, campo in (("L0", "description"), ("L1", "resumen")):
+        declarado = budget.get("levels", {}).get(nivel, {}).get("field")
+        if declarado != campo:
+            problems.append(f"`read_budget` declara {nivel} como `{declarado}` "
+                            f"y debería ser `{campo}`")
+        if declarado not in contract.common:
+            problems.append(f"{nivel} apunta a `{declarado}`, que no es un campo común: "
+                            f"no se podría proyectar como columna")
+    if not budget.get("agent_rules_es"):
+        problems.append("`read_budget` no declara reglas para el agente")
+    elif not any("no abriste" in r or "sin abrir" in r
+                 for r in budget["agent_rules_es"]):
+        problems.append("`read_budget` no dice qué hacer cuando el tope no alcanza, "
+                        "que es la regla que evita responder como si se hubiera "
+                        "leído lo que no se abrió")
+
+    tope = budget.get("default_body_cap")
+    modulo = ROOT / "kernel" / "modulos" / "consulta" / "consultar.md"
+    if tope and modulo.exists():
+        texto = modulo.read_text(encoding="utf-8")
+        topes = {int(n) for n in re.findall(r"[Mm]áximo (\d+) por consulta", texto)}
+        topes |= {int(n) for n in re.findall(r"como máximo (\d+) documentos", texto)}
+        if topes and topes != {tope}:
+            problems.append(f"el módulo de consulta enseña un tope de "
+                            f"{sorted(topes)} y el contrato declara {tope}: el "
+                            f"agente obedecería al módulo y la medición iría "
+                            f"contra otro número")
+        if not topes:
+            problems.append(f"el módulo de consulta no enseña el tope de aperturas; "
+                            f"el contrato declara {tope} y nadie se lo dice al agente")
+    return problems
+
+
 def check_layering() -> List[str]:
     """El corte por trabajos sigue siendo un corte.
 
@@ -1223,7 +1273,8 @@ def main() -> int:
     failures = (check_provenance(contract) + check_yaml_compatibility(contract)
                 + check_locations(contract) + check_derived_specs(contract)
                 + check_period_formats(contract) + check_role_profiles(contract)
-                + check_layering() + check_ddl(contract)
+                + check_layering() + check_read_budget(contract)
+                + check_ddl(contract)
                 + check_projection(contract) + check_init(contract)
                 + check_competency_questions(contract))
 
@@ -1261,7 +1312,8 @@ def main() -> int:
         return 1
 
     profiles = brain.find_profiles(ROOT / "kernel")
-    print(f"OK -- provenance completo, derivados consistentes, el DDL lo acepta "
+    print(f"OK -- provenance completo, derivados consistentes, el presupuesto de "
+          f"lectura sin bifurcar, el DDL lo acepta "
           f"SQLite y deriva del contrato, la proyección incremental dice lo mismo "
           f"que `--full`, formas de periodo "
           f"disjuntas, los {len(profiles)} profiles de rol completos, las capas "
