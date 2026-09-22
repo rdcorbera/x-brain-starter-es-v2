@@ -106,7 +106,7 @@ CREATE TABLE "insumo" (
   "doc" TEXT NOT NULL PRIMARY KEY REFERENCES "documentos"("path") ON DELETE CASCADE,
   "proyecto" TEXT NOT NULL,
   "formato" TEXT NOT NULL CHECK ("formato" IN ('pdf', 'docx', 'pptx', 'xlsx', 'html', 'yaml')),
-  "origen" TEXT NOT NULL
+  "original" TEXT NOT NULL
 ) STRICT;
 
 CREATE TABLE "lineamiento" (

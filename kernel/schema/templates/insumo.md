@@ -11,7 +11,7 @@ resumen_hash: <sha256 del cuerpo, que imprime `./brain hash ARCHIVO --body` (o l
 procedencia: manual          # fuente | dialogo | inferido | manual | derivado
 proyecto: transversal
 formato: pdf          # pdf | docx | pptx | xlsx | html | yaml
-origen: </raw/AAAA-MM-DD-descripcion-uuid.ext>
+original: </raw/AAAA-MM-DD-descripcion-uuid.ext>
 ---
 
 # Avisos de conversión

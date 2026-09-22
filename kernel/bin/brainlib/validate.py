@@ -521,7 +521,7 @@ class Validator:
         menos debería.
 
         Qué cuenta como fuente lo dice el contrato, no este código:
-        `Insumo.origen` vale tanto como `sources`, porque ahí es donde el
+        `Insumo.original` vale tanto como `sources`, porque ahí es donde el
         conversor deja el puntero a `/raw/` y exigir la misma ruta dos veces
         solo crearía dos sitios donde discrepar.
         """
@@ -532,7 +532,7 @@ class Validator:
         for nombre in regla.get("satisfied_by", []):
             tipo, _, campo = nombre.rpartition(".")
             if tipo and tipo != type_name:
-                continue          # `Insumo.origen` solo cuenta en un Insumo
+                continue          # `Insumo.original` solo cuenta en un Insumo
             if campo not in campos:
                 continue
             valor = doc.meta.get(campo)

@@ -103,7 +103,7 @@
         "yaml"
       ]
     },
-    "origen": {
+    "original": {
       "type": "string"
     }
   },
@@ -119,6 +119,6 @@
     "procedencia",
     "proyecto",
     "formato",
-    "origen"
+    "original"
   ]
 }

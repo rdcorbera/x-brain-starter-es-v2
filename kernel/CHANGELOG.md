@@ -27,6 +27,12 @@ que faltaba.
 - **`Playbook` se escindió en dos:** un `Playbook` se **sigue** (proceso reutilizable), un
   `Analisis` se **consulta** (estudio archivado). El contrato de v1 lo decía sin querer — su
   descripción rezaba *«a reusable process, OR an archived analysis»*.
+- **`Insumo.origen` pasa a llamarse `Insumo.original`.** En v1 la clave `origen` significaba dos
+  cosas: en una `Iniciativa` es un enum —de dónde viene el encargo— y en un `Insumo` era el enlace
+  al original inmutable de `raw/`. Declarar los campos por tipo hacía la colisión inofensiva para
+  el validador y para la proyección, nunca para quien lee, y **un agente lee la clave antes que el
+  `type`**. `original` es además la palabra que el kernel ya usaba para esos archivos en toda su
+  prosa.
 - **`Indice`** entra como tipo: OKF exige frontmatter tipado en todo `.md` no reservado, así
   que un derivado como `PREGUNTAS-ABIERTAS.md` necesita uno para ser conformante.
 
@@ -317,3 +323,6 @@ hace es cumplir el perfil de v2.
 > **Consecuencia para quien mantiene el kernel:** todo lo que el contrato conservaba «por coste
 > de migración» —los nombres de campo con guion, `type-key` en vez de enlaces, las tres formas de
 > `periodo` sin declarar— se quedó sin ese argumento. Vuelve a ser discutible por sus méritos.
+> **`type-key` ya se revisó así y se queda** (2026-09-21): la clave sobrevive al archivado por
+> periodo, que mueve la carpeta del proyecto en cada cierre, y un enlace por ruta no. Su nota en el
+> contrato ya no invoca el coste de migración.

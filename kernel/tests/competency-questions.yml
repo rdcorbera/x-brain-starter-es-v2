@@ -490,11 +490,11 @@ questions:
       where dg.proyecto = :proyecto group by dg.clase
 
   - id: CQ-43
-    question: "¿Qué insumos archivados sustentan esta iniciativa o decisión y cuál es su origen?"
+    question: "¿Qué insumos archivados sustentan esta iniciativa o decisión y de qué original vienen?"
     asked_by: "roles regulados, legal"
     types: [Insumo, Iniciativa, Decision]
-    fields: [origen, formato, proyecto, sources]
-    criterion: "Insumo referenciado por la iniciativa o decisión; devolver origen"
+    fields: [original, formato, proyecto, sources]
+    criterion: "Insumo referenciado por la iniciativa o decisión; devolver el puntero a su original"
     decision: "acreditar procedencia en un contexto de auditoría"
     frequency: esporadica       # inferred
     answer_shape: lista
@@ -503,7 +503,7 @@ questions:
     cost_today: "buscar el original que respalda una afirmación en auditoría"
     note: "Única pregunta que roza a Insumo, y es de procedencia, no de contenido. Ver type_verdicts."
     sql: >-
-      select d.title, i.origen, i.formato from insumo i
+      select d.title, i.original, i.formato from insumo i
       join documentos d on d.path = i.doc where i.proyecto = :proyecto
 
   - id: CQ-44
@@ -830,10 +830,12 @@ questions:
       ubicaciones y checks, y solo para sus propios documentos; el enum lo
       expresa en todo el catálogo. Valores: fuente, dialogo, inferido, manual.
       CORREGIDO en la revisión 3: la entrega lo llamaba `origen`, y ese nombre
-      ya está tomado dos veces con dos tipos de dato distintos --
-      `Iniciativa.origen` es un enum y `Insumo.origen` un enlace a /raw/--, y
-      `derived_files.GOALS.md` agrupa por él. `procedencia` no colisiona con
-      nada y es el término del paper.
+      ya estaba tomado dos veces con dos tipos de dato distintos --
+      `Iniciativa.origen` es un enum e `Insumo.origen` era un enlace a /raw/--,
+      y `derived_files.GOALS.md` agrupa por él. `procedencia` no colisiona con
+      nada y es el término del paper. (La otra colisión se cerró aparte el
+      2026-09-21: `Insumo.origen` pasó a llamarse `Insumo.original`. Esta
+      corrección no dependía de aquella -- `Iniciativa.origen` sigue ahí.)
     sql: >-
       select procedencia, count(*) as documentos,
       sum(case when exists (select 1 from documentos_verified v
@@ -1104,7 +1106,7 @@ revision_3_corrections:
     Las decisiones 2, 3 y 4 del plan de implementación se tomaron con estas
     cuatro correcciones sobre la mesa.
   corrections:
-    - {cq: CQ-52, was: "campo común `origen`", now: "campo común `procedencia`", why: "`origen` ya lo declaran Iniciativa (enum) e Insumo (link) con significados distintos, y derived_files.GOALS.md agrupa por él"}
+    - {cq: CQ-52, was: "campo común `origen`", now: "campo común `procedencia`", why: "`origen` ya lo declaran Iniciativa (enum) e Insumo (link) con significados distintos, y derived_files.GOALS.md agrupa por él. Al día de hoy solo lo declara Iniciativa: Insumo.origen pasó a `original` el 2026-09-21, y la corrección sigue siendo correcta por la mitad que queda"}
     - {cq: ADV-14, was: "origen=fuente / origen=inferido", now: "procedencia=...", why: "mismo renombrado que CQ-52"}
     - {cq: CQ-47, was: "fields: [fecha, proyecto, title] y la nota afirmaba que `fecha` existe en los cinco tipos", now: "fields incluye fecha-creacion y ultima-revision; la vista se genera por data_type: date", why: "Pregunta declara `fecha-creacion` y Plan `ultima-revision`. Seleccionar por el NOMBRE `fecha` omitiría dos de los cinco tipos EN SILENCIO. Es el mismo desajuste ya corregido en CQ-41"}
     - {cq: CQ-48, was: "silencio sobre Lineamiento", now: "el alcance real queda escrito en la nota", why: "Lineamiento no declara `estado`, ni `reemplazada_por`, ni `proyecto`: sobre ese tipo la CQ no es respondible añadiendo solo las dos fechas"}

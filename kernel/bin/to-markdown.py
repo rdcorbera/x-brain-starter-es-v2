@@ -821,7 +821,7 @@ def build_document(path: Path, rows: int, source: Optional[str],
     if doc_type == "Diagrama":
         front += ["clase: flujo", f"version: {now[:10]}"]
     else:
-        front += [f"formato: {FORMAT_BY_EXT[ext]}", f"origen: {pointer}"]
+        front += [f"formato: {FORMAT_BY_EXT[ext]}", f"original: {pointer}"]
     front += ["---", ""]
 
     document = front + [
