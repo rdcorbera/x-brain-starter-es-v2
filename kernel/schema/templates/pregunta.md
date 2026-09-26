@@ -12,7 +12,7 @@ procedencia: manual          # fuente | dialogo | inferido | manual | derivado
 proyecto: transversal
 estado: abierta          # abierta | en-progreso | respondida
 bloqueante: false
-fecha-creacion: <YYYY-MM-DD>
+created: <YYYY-MM-DD>
 ---
 
 # Contexto

@@ -65,8 +65,8 @@ questions:
     question: "¿Qué preguntas llevan más de N días abiertas sin avance?"
     asked_by: "rol individual"
     types: [Pregunta]
-    fields: [estado, fecha-creacion]
-    criterion: "Pregunta con estado=abierta y (hoy - fecha-creacion) > N"
+    fields: [estado, created]
+    criterion: "Pregunta con estado=abierta y (hoy - created) > N"
     decision: "escalar o cerrar lo estancado antes de que se pudra"
     frequency: semanal
     answer_shape: lista
@@ -80,10 +80,10 @@ questions:
       v1 dispersa los umbrales en prosa (2, 7 y 14 días en cuatro sitios).
       Deben venir de un solo lugar.
     sql: >-
-      select d.title, q.fecha_creacion from pregunta q
+      select d.title, q.created from pregunta q
       join documentos d on d.path = q.doc
       where q.estado = 'abierta'
-      and julianday(:hoy) - julianday(q.fecha_creacion) > :dias
+      and julianday(:hoy) - julianday(q.created) > :dias
 
   - id: CQ-35
     question: "¿Qué preguntas abiertas no tienen responsable asignado?"
@@ -282,8 +282,8 @@ questions:
     question: "¿Qué planes tengo cuya última revisión es más antigua que su cadencia esperada?"
     asked_by: "gestión de proyecto/producto"
     types: [Plan]
-    fields: [ultima-revision, proyecto, fuente-de-verdad]
-    criterion: "Plan con (hoy - ultima-revision) > umbral"
+    fields: [last_review, proyecto, source_of_truth]
+    criterion: "Plan con (hoy - last_review) > umbral"
     decision: "qué plan reviso antes de citarlo como fuente de verdad"
     frequency: mensual          # inferred
     answer_shape: lista
@@ -292,9 +292,9 @@ questions:
     cost_today: "no se sabe si el plan está desactualizado hasta que falla"   # inferred
     note: "Única CQ que sostiene el tipo Plan, y lo sostiene débilmente. Ver type_verdicts."
     sql: >-
-      select d.title, pl.ultima_revision, pl.fuente_de_verdad from plan pl
+      select d.title, pl.last_review, pl.source_of_truth from plan pl
       join documentos d on d.path = pl.doc
-      where julianday(:hoy) - julianday(pl.ultima_revision) > :umbral
+      where julianday(:hoy) - julianday(pl.last_review) > :umbral
 
   - id: CQ-42
     question: "¿Qué iniciativas dependen de este sistema o de esta persona?"
@@ -332,7 +332,7 @@ questions:
     evidence: "Wegner 1987 (memoria transactiva, «who knows what»). Hertzum & Pejtersen 2000: se busca a la persona que puede explicar o desbloquear."
     cost_today: "se reconstruye de memoria justo antes de la reunión; se olvida cobrar cosas"
     sql: >-
-      select d.title, q.proyecto, q.fecha_creacion from pregunta q
+      select d.title, q.proyecto, q.created from pregunta q
       join documentos d on d.path = q.doc
       where q.responsable = :persona and q.estado = 'abierta'
 
@@ -340,8 +340,8 @@ questions:
     question: "¿Quién reporta a quién y qué huecos tiene el organigrama que conozco?"
     asked_by: "rol individual con red de trabajo"
     types: [Persona]
-    fields: [reporta-a, rol, equipo]
-    criterion: "grafo de Persona por reporta-a; huecos = Persona sin reporta-a o sin rol"
+    fields: [reports_to, rol, equipo]
+    criterion: "grafo de Persona por reports_to; huecos = Persona sin reports_to o sin rol"
     decision: "a quién escalo; a quién pido aprobación"
     frequency: mensual
     answer_shape: tabla
@@ -349,17 +349,17 @@ questions:
     evidence: "Wegner 1987: directorio de expertise. Hertzum & Pejtersen 2000: localizar a la persona correcta."
     cost_today: "preguntar a colegas quién manda en qué; conocimiento tácito"
     sql: >-
-      select d.title, pe.rol, pe.equipo, pe.reporta_a,
-      case when pe.reporta_a is null or pe.rol is null then 'hueco' else 'completo' end
+      select d.title, pe.rol, pe.equipo, pe.reports_to,
+      case when pe.reports_to is null or pe.rol is null then 'hueco' else 'completo' end
       as ficha
       from persona pe join documentos d on d.path = pe.doc
-      order by ficha, coalesce(pe.reporta_a, '')
+      order by ficha, coalesce(pe.reports_to, '')
 
   - id: CQ-41
     question: "¿Qué preguntas respondió esta persona y en qué documentos quedó la respuesta?"
     asked_by: "rol individual"
     types: [Pregunta, Persona]
-    fields: [respondida_por, estado, fecha-creacion]
+    fields: [respondida_por, estado, created]
     criterion: "Pregunta con respondida_por=persona y estado=respondida"
     decision: "a quién vuelvo por seguimiento; a quién acredito"
     frequency: esporadica       # inferred
@@ -367,7 +367,7 @@ questions:
     grows_with_n: true
     evidence: "Wegner 1987: metamemoria de quién respondió qué. Hertzum 2002: atribución correcta de la fuente."
     cost_today: "recordar quién contestó qué; se pierde la atribución"
-    note: "Corregido en la entrada: Pregunta no tiene `fecha`, tiene `fecha-creacion`."
+    note: "Corregido en la entrada: Pregunta no tiene `fecha`, tiene `created` (llamado `fecha-creacion` hasta el 2026-09-22)."
     sql: >-
       select d.title, q.respondida_por from pregunta q
       join documentos d on d.path = q.doc
@@ -377,8 +377,8 @@ questions:
     question: "¿Qué sistemas son propiedad de esta persona o equipo?"
     asked_by: "rol individual / gestión"
     types: [Sistema, Persona]
-    fields: [dueño, categoria, estado]
-    criterion: "Sistema filtrado por dueño=persona/equipo"
+    fields: [owner, categoria, estado]
+    criterion: "Sistema filtrado por owner=persona/equipo"
     decision: "a quién pido acceso o cambios sobre un sistema"
     frequency: mensual          # inferred
     answer_shape: lista
@@ -388,7 +388,7 @@ questions:
     sql: >-
       select d.title, s.categoria, s.estado from sistema s
       join documentos d on d.path = s.doc
-      where s."dueño" = :persona or s."dueño" = :equipo
+      where s."owner" = :persona or s."owner" = :equipo
 
   # -- reconstrucción de contexto: tiempo y entidades -------------------------
 
@@ -626,7 +626,7 @@ questions:
     question: "¿Qué pasó en esta iniciativa entre dos fechas, en orden cronológico y con su fuente?"
     asked_by: "rol individual (cualquiera que gestione trabajo propio)"
     types: [Reunion, Decision, Pregunta, Analisis, Plan]
-    fields: [fecha, fecha-creacion, ultima-revision, proyecto, title]
+    fields: [fecha, created, last_review, proyecto, title]
     criterion: >-
       una sola lista ordenada por fecha que mezcla los tipos fechados de un
       proyecto; cada fila enlaza a su documento y declara su tipo
@@ -642,8 +642,8 @@ questions:
     note: >-
       CORREGIDO en la revisión 3. La entrega decía «`fecha` y `proyecto` ya
       existen en los cinco tipos implicados» y es falso: solo Reunion, Decision
-      y Analisis declaran `fecha`; Pregunta declara `fecha-creacion` y Plan
-      declara `ultima-revision`. Es el mismo desajuste que ya se corrigió una
+      y Analisis declaran `fecha`; Pregunta declara `created` y Plan
+      declara `last_review`. Es el mismo desajuste que ya se corrigió una
       vez en CQ-41.
       CONSECUENCIA DE DISEÑO: la vista de eventos NO puede seleccionar por el
       NOMBRE `fecha` -- omitiría dos de los cinco tipos en silencio. Se genera
@@ -886,10 +886,10 @@ adversarial:
     harm: "jerarquía inventada; se escala al interlocutor equivocado"
     evidence: "heredada del borrador. Reforzada por ADV-11."
     sql: >-
-      select pe.doc, pe.reporta_a from persona pe
-      where pe.reporta_a is not null and trim(pe.reporta_a) <> ''
+      select pe.doc, pe.reports_to from persona pe
+      where pe.reports_to is not null and trim(pe.reports_to) <> ''
       and not exists (select 1 from documentos d
-      where '/' || d.path = pe.reporta_a or d.path = pe.reporta_a)
+      where '/' || d.path = pe.reports_to or d.path = pe.reports_to)
 
   - id: ADV-04
     question: "¿Cuál es el estado de este proyecto?"
@@ -966,13 +966,13 @@ adversarial:
 
   - id: ADV-11
     question: "¿Cuál es la jerarquía / quién manda entre A y B?"
-    must_not: "inferir una relación reporta-a que no está declarada en el campo"
+    must_not: "inferir una relación reports_to que no está declarada en el campo"
     harm: "se asume una autoridad inexistente"
     evidence: "Wegner 1987: el directorio de «who knows what» debe ser explícito. Evidence override (arXiv 2604.09174): relleno de huecos con inferencia no soportada."
     sql: >-
       select a.doc as persona_a, b.doc as persona_b from persona a
-      join persona b on ('/' || b.doc = a.reporta_a or b.doc = a.reporta_a)
-      where ('/' || a.doc = b.reporta_a or a.doc = b.reporta_a)
+      join persona b on ('/' || b.doc = a.reports_to or b.doc = a.reports_to)
+      where ('/' || a.doc = b.reports_to or a.doc = b.reports_to)
 
   - id: ADV-12
     question: "Dame la fuente de esta decisión."
@@ -1086,7 +1086,7 @@ intake_corrections:
     - {cq: CQ-29, was: "estado=vigente",   now: "Decision.estado=aceptada", why: "no existe en Decision ni en Sistema (activo|en-cambio|deprecado)"}
     - {cq: CQ-37, was: "fields incluía proyecto con types vacío", now: "fields: [classification]", why: "`proyecto` no es campo común: lo declaran 8 de 13 tipos"}
     - {cq: CQ-40, was: "fields incluía periodo", now: "rango sobre fecha", why: "`periodo` es campo de Iniciativa, no de Decision"}
-    - {cq: CQ-41, was: "fields incluía fecha", now: "fecha-creacion",   why: "Pregunta no declara `fecha`"}
+    - {cq: CQ-41, was: "fields incluía fecha", now: "created",   why: "Pregunta no declara `fecha`. El campo se llamaba `fecha-creacion` cuando se escribió esta corrección; pasó a `created` el 2026-09-22"}
     - {cq: CQ-44, was: "status=vigente",   now: "status=stable",        why: "mismo enum que CQ-24"}
     - {cq: ADV-07, was: "Decision estado=vigente", now: "estado=aceptada", why: "mismo enum que CQ-27"}
 
@@ -1108,7 +1108,7 @@ revision_3_corrections:
   corrections:
     - {cq: CQ-52, was: "campo común `origen`", now: "campo común `procedencia`", why: "`origen` ya lo declaran Iniciativa (enum) e Insumo (link) con significados distintos, y derived_files.GOALS.md agrupa por él. Al día de hoy solo lo declara Iniciativa: Insumo.origen pasó a `original` el 2026-09-21, y la corrección sigue siendo correcta por la mitad que queda"}
     - {cq: ADV-14, was: "origen=fuente / origen=inferido", now: "procedencia=...", why: "mismo renombrado que CQ-52"}
-    - {cq: CQ-47, was: "fields: [fecha, proyecto, title] y la nota afirmaba que `fecha` existe en los cinco tipos", now: "fields incluye fecha-creacion y ultima-revision; la vista se genera por data_type: date", why: "Pregunta declara `fecha-creacion` y Plan `ultima-revision`. Seleccionar por el NOMBRE `fecha` omitiría dos de los cinco tipos EN SILENCIO. Es el mismo desajuste ya corregido en CQ-41"}
+    - {cq: CQ-47, was: "fields: [fecha, proyecto, title] y la nota afirmaba que `fecha` existe en los cinco tipos", now: "fields incluye created y last_review; la vista se genera por data_type: date", why: "Pregunta declara `created` y Plan `last_review` —`fecha-creacion` y `ultima-revision` cuando se escribió esta corrección—. Seleccionar por el NOMBRE `fecha` omitiría dos de los cinco tipos EN SILENCIO. Es el mismo desajuste ya corregido en CQ-41"}
     - {cq: CQ-48, was: "silencio sobre Lineamiento", now: "el alcance real queda escrito en la nota", why: "Lineamiento no declara `estado`, ni `reemplazada_por`, ni `proyecto`: sobre ese tipo la CQ no es respondible añadiendo solo las dos fechas"}
     - {cq: CQ-51, was: "silencio sobre Lineamiento", now: "misma advertencia que CQ-48", why: "su criterio exige `reemplazada_por`, que Lineamiento no declara"}
     - {cq: CQ-45, was: "sin posición sobre la clave `sql:`", now: "declarada la salvedad", why: "consulta log-consultas.md, que es markdown y no una tabla proyectada; T8 exige `sql:` a toda CQ"}
@@ -1165,7 +1165,7 @@ corpus_reality_check:
   parciales_detalle: >-
     Cinco CQs dependen de campos que el corpus no tiene todavía: generated y
     verified (CQ-23), status y stale_after (CQ-24), classification (CQ-37),
-    respondida_por (CQ-41) y dueño (CQ-39). Los tres primeros son la capa de
+    respondida_por (CQ-41) y owner (CQ-39). Los tres primeros son la capa de
     confianza y ciclo de vida de OKF v0.2, ausente entera en un cerebro de v1:
     esperado, y es exactamente lo que la migración del paso 9 añade. Cuatro
     adversariales (ADV-05, ADV-09, ADV-10, ADV-12) dependen de esos mismos

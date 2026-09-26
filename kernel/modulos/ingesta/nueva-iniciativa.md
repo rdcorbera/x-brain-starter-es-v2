@@ -78,8 +78,8 @@ no entiende la pregunta, nunca una respuesta sugerida que solo haya que aceptar.
    existe. **No es para armar la lista: es para no duplicarla.** Si las tareas ya viven en un
    tracker, un plan completo en el cerebro es una segunda fuente de verdad que se desactualiza
    en dos semanas, y desde ahí todo lo que el cerebro diga del avance es falso.
-   → `fuente-de-verdad`. Con `cerebro`, el plan manda. Con `externa`, se guarda **solo la tajada
-   del usuario** más el puntero en `tracker-externo`, y ningún skill afirma progreso global.
+   → `source_of_truth`. Con `cerebro`, el plan manda. Con `externa`, se guarda **solo la tajada
+   del usuario** más el puntero en `external_tracker`, y ningún skill afirma progreso global.
 
 > Las preguntas 8 y 9 son de planificación. Si la iniciativa no da para un plan —un objetivo
 > personal chico, algo de dos semanas—, se saltan sin insistir y el proyecto arranca sin
@@ -179,7 +179,7 @@ pregunta nada nuevo:**
 | `# Entregado` | La respuesta 3, **copiada literal** del `CONTEXT.md` |
 | Las fases | El flujo de la 4, con los hitos de la 8 como línea `> **Hito:**` |
 | Las tareas | El inventario del análisis inicial; responsables de la 6, dependencias de la repregunta de la 4. Ids `T01`, `T02`… |
-| `fuente-de-verdad` | La respuesta 9. Si es `externa`, solo el esqueleto de fases, la tajada del usuario y el puntero en `tracker-externo` — nunca copiar el tracker |
+| `source_of_truth` | La respuesta 9. Si es `externa`, solo el esqueleto de fases, la tajada del usuario y el puntero en `external_tracker` — nunca copiar el tracker |
 
 **Sin documentación inicial el plan sale delgado**, con las fases y las pocas tareas que el
 usuario haya mencionado. Es correcto. **No rellenar con tareas plausibles.**

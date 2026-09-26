@@ -10,8 +10,8 @@ resumen: "<panorama en ~600 caracteres: qué dice este documento y qué decide q
 resumen_hash: <sha256 del cuerpo, que imprime `./brain hash ARCHIVO --body` (o lo escribe `--write`)>
 procedencia: manual          # fuente | dialogo | inferido | manual | derivado
 proyecto: <el slug del proyecto; `transversal` si no pertenece a ninguno>
-fuente-de-verdad: cerebro          # cerebro | externa
-ultima-revision: <YYYY-MM-DD>
+source_of_truth: cerebro          # cerebro | externa
+last_review: <YYYY-MM-DD>
 ---
 
 # Entregado

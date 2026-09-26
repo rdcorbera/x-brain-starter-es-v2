@@ -95,7 +95,7 @@
     "equipo": {
       "type": "string"
     },
-    "reporta-a": {
+    "reports_to": {
       "type": "string"
     }
   },

@@ -34,10 +34,10 @@
     "enforcement": "`brain.py validate` on pre-commit (only what changes) and in CI (the whole bundle). A control nobody runs is not a control."
   },
   "language_policy": {
-    "note": "The rule, stated as a test rather than a preference: ANY string this contract renders into an artifact a person reads is content and is Spanish; everything else is configuration and is English. In practice that means `note` is always English -- it is commentary for whoever maintains the contract, and nothing renders it -- while `placeholder`, `guide`, `heading`, the `bundle_schema` strings, the `derived_files` strings and the classification `description`/`handling` are always Spanish. Field KEYS stay as production writes them. Enum VALUES split by scope: per-type enums are Spanish because they live in 10.000 documents and renaming them is a corpus migration; the two common-field enums (`status`, `classification`) are English because they travel in every document next to each other and `status` comes from OKF.",
+    "note": "The rule, stated as a test rather than a preference: ANY string this contract renders into an artifact a person reads is content and is Spanish; everything else is configuration and is English. In practice that means `note` is always English -- it is commentary for whoever maintains the contract, and nothing renders it -- while `placeholder`, `guide`, `heading`, the `bundle_schema` strings, the `derived_files` strings and the classification `description`/`handling` are always Spanish. Field KEYS are configuration, so the rule makes them English. The policy used to read `field keys stay as production writes them`, which was a migration argument, and it died with the migration on 2026-09-16. Six keys were converted on 2026-09-22 -- `source_of_truth`, `external_tracker`, `last_review`, `created`, `reports_to`, `owner` -- because those were the ones that also carried a hyphen or an n-tilde. THE REST OF THE PER-TYPE KEYS ARE STILL SPANISH (`proyecto`, `periodo`, `estado`, `decisores`, `procedencia`, `valido_desde`...), and after that change the policy no longer justifies them: they are an open question, not a settled exception. Said plainly because the alternative is a rule that reads as if it were being followed. Enum VALUES split by scope: per-type enums are Spanish because they are RENDERED TO PEOPLE -- ESQUEMA.md, the templates and the derived indexes all print them -- which is the reason that survives on its own; the policy used to add that they live in 10.000 documents, a figure this repo never verified and measured at 301, and a crutch the decision does not need. The two common-field enums (`status`, `classification`) are English because they travel in every document next to each other and `status` comes from OKF.",
     "config": "en",
     "content": "es",
-    "history": "Two leaks were found by applying this rule after the fact. The classification `description`/`handling` had been translated to English and were rendering inside the bundle's own ESQUEMA.md. And `placeholder` did not exist: the generator fell back to `note`, so `Sistema.dueño` emitted a full English paragraph about migration costs and check numbers into the user's document. Separating the two roles is what fixed it -- one string cannot serve both an engineer and a reader."
+    "history": "Two leaks were found by applying this rule after the fact. The classification `description`/`handling` had been translated to English and were rendering inside the bundle's own ESQUEMA.md. And `placeholder` did not exist: the generator fell back to `note`, so `Sistema.owner` (then `Sistema.dueño`) emitted a full English paragraph about migration costs and check numbers into the user's document. Separating the two roles is what fixed it -- one string cannot serve both an engineer and a reader."
   },
   "location_rules": {
     "note": "Locations are ROUTING data, not documentation. `brain place` answers 'where does this document go', so /x-procesar-inbox no longer decides destinations from prose spread across three skill modules, and V19 validates against the same declaration. A pattern may be a plain string or an object with `when` (same shape as derived_files.where) and `role`.",
@@ -332,17 +332,17 @@
       "fields": {
         "proyecto":         { "data_type": "type-key", "to": "Iniciativa", "required": true,
                               "note": "No `transversal` sentinel, unlike every other type keyed on a project: a PLAN.md lives inside a project folder by definition, so a plan with no project cannot exist. Declaring a value valid with nowhere to put it is the defect this removal closes." },
-        "fuente-de-verdad": { "data_type": "enum", "values": ["cerebro", "externa"], "default": "cerebro", "required": true,
+        "source_of_truth": { "data_type": "enum", "values": ["cerebro", "externa"], "default": "cerebro", "required": true,
                               "hint": "`externa` si las tareas ya viven en Jira, Asana o un Excel del área; entonces este plan es un espejo y ningún skill afirma progreso global" },
-        "tracker-externo":  { "data_type": "text", "required": false,
+        "external_tracker": { "data_type": "text", "required": false,
                               "placeholder": "URL o nombre del tracker real" },
-        "ultima-revision":  { "data_type": "date", "required": true,
+        "last_review":      { "data_type": "date", "required": true,
                               "placeholder": "AAAA-MM-DD de la última vez que se revisó contra la realidad" }
       },
       "conditions": [
         {
-          "if": { "fuente-de-verdad": "externa" },
-          "then_required": ["tracker-externo"],
+          "if": { "source_of_truth": "externa" },
+          "then_required": ["external_tracker"],
           "note": "A plan declared a mirror with no pointer to what it mirrors is worse than no plan: it looks authoritative and is not."
         }
       ],
@@ -435,7 +435,7 @@
         "estado":         { "data_type": "enum", "values": ["abierta", "en-progreso", "respondida"], "default": "abierta", "required": true },
         "responsable":    { "data_type": "person-ref", "required": false, "steward": true, "hint": "a quién se le pregunta; vacío es un hueco declarado, nunca un supuesto", "note": "who to ask. Empty is a declared gap, never a guess." },
         "bloqueante":     { "data_type": "boolean", "default": false, "required": true },
-        "fecha-creacion": { "data_type": "date", "required": true },
+        "created":        { "data_type": "date", "required": true },
         "respondida_por": { "data_type": "link", "required": false, "note": "new in v2: what answered it" }
       },
       "conditions": [
@@ -457,7 +457,7 @@
       "fields": {
         "rol":       { "data_type": "text", "required": true, "placeholder": "ej. Líder de Producto" },
         "equipo":    { "data_type": "text", "required": false },
-        "reporta-a": { "data_type": "typed-ref", "to": "Persona", "required": false, "hint": "vacío es un hueco declarado con su Pregunta; nunca se infiere de un correo ni de un organigrama parcial", "note": "empty is a declared gap in the org chart and must have its own Pregunta. Never inferred from an email header or a partial chart." }
+        "reports_to": { "data_type": "typed-ref", "to": "Persona", "required": false, "hint": "vacío es un hueco declarado con su Pregunta; nunca se infiere de un correo ni de un organigrama parcial", "note": "empty is a declared gap in the org chart and must have its own Pregunta. Never inferred from an email header or a partial chart." }
       },
       "sections": [
         { "heading": "Qué sabe / qué maneja", "guide": "dominios, sistemas o temas en los que es la referencia", "required": true },
@@ -471,7 +471,7 @@
       "description": "Profile of a system, tool, product or process of the organization",
       "location": ["03-recursos/sistemas-y-herramientas/"],
       "fields": {
-        "dueño":     { "data_type": "person-ref", "required": true, "steward": true, "placeholder": "enlace a la ficha de quien responde, o su nombre", "note": "owner of the system. The key carries an n-tilde and is kept as-is: renaming it would be a migration of every brain in production. As a person-ref, a free-text name is tolerated and reported by V17 until it resolves to a ficha." },
+        "owner":     { "data_type": "person-ref", "required": true, "steward": true, "placeholder": "enlace a la ficha de quien responde, o su nombre", "note": "owner of the system. It was `dueño` until 2026-09-22: the n-tilde was kept because renaming it would have been a migration of every brain in production, and that argument died with the migration on 2026-09-16. The key also had to be typed with an n-tilde in every hand-written query, since the projection quotes identifiers rather than folding them. As a person-ref, a free-text name is tolerated and reported by V17 until it resolves to a ficha." },
         "categoria": { "data_type": "enum", "values": ["sistema", "herramienta", "producto", "proceso"], "default": "sistema", "required": true },
         "estado":    { "data_type": "enum", "values": ["activo", "en-cambio", "deprecado"], "default": "activo", "required": true }
       },
@@ -622,14 +622,14 @@
       "from": "Pregunta",
       "render": "table",
       "where": { "estado": ["abierta", "en-progreso"] },
-      "order_by": [{ "field": "bloqueante", "desc": true }, { "field": "fecha-creacion" }],
+      "order_by": [{ "field": "bloqueante", "desc": true }, { "field": "created" }],
       "flag": { "field": "bloqueante", "prefix": "**[bloqueante]** " },
       "empty_row": "_ninguna_",
       "columns": [
         { "header": "Pregunta",    "value": "title", "link": true },
         { "header": "Responsable", "value": "responsable", "resolve": true },
         { "header": "Proyecto",    "value": "proyecto" },
-        { "header": "Días",        "value": "days_since:fecha-creacion" }
+        { "header": "Días",        "value": "days_since:created" }
       ]
     },
 
@@ -670,21 +670,21 @@
       "note": "v1 shipped this as a hand-written Playbook whose three blocks the model rewrote on every /x-nueva-iniciativa and every /x-actualizacion-semanal -- Slope A in a file the survey never counted. It needs no new type: `Iniciativa.origen` is already an enum of exactly those three blocks, and v1's own module says so (`el origen define a qué bloque de GOALS.md se engancha`). `from_role: active` is what makes 'the period in course' derivable without writing the period down: an initiative leaves it by being moved to the archive, and both locations are already declared."
     },
     "02-areas/personas/ORGANIGRAMA.md": {
-      "resumen": "Índice generado de la estructura de reporte de la organización, construido desde el campo `reporta-a` de cada ficha Persona. Sirve para ubicar a alguien y para encontrar al responsable de un tema sin preguntarlo.",
+      "resumen": "Índice generado de la estructura de reporte de la organización, construido desde el campo `reports_to` de cada ficha Persona. Sirve para ubicar a alguien y para encontrar al responsable de un tema sin preguntarlo.",
       "type": "Diagrama",
       "title": "Organigrama",
-      "description": "Quién reporta a quién, derivado del campo reporta-a de cada ficha Persona.",
+      "description": "Quién reporta a quién, derivado del campo reports_to de cada ficha Persona.",
       "heading": "Organigrama",
       "fields": { "proyecto": "transversal", "clase": "organizacion" },
       "from": "Persona",
       "render": "mermaid-graph",
-      "edge": "reporta-a",
+      "edge": "reports_to",
       "label": "title",
       "gaps": {
         "heading": "Huecos declarados",
-        "guide": "Sin `reporta-a`. Cada uno debe tener su Pregunta; nunca se infiere."
+        "guide": "Sin `reports_to`. Cada uno debe tener su Pregunta; nunca se infiere."
       },
-      "note": "v1 shipped this as type Diagrama with no proyecto, clase or version. Generating it supplies all three, so the defect becomes impossible rather than merely detectable. A missing reporta-a is a declared gap, rendered as such -- never inferred."
+      "note": "v1 shipped this as type Diagrama with no proyecto, clase or version. Generating it supplies all three, so the defect becomes impossible rather than merely detectable. A missing reports_to is a declared gap, rendered as such -- never inferred."
     }
   },
   "projection": {
@@ -694,7 +694,7 @@
     "documents_table": "documentos",
     "database": { "path": "_db/brain.db", "note": "Relative to the working directory, not to the bundle: the projection is derived and disposable, and `.gitignore` already keeps `_db/` out. R9 allows it beside the bundle -- what it must never be is inside a synced folder, which `sqlite-probe.py` checks by attempting WAL." },
     "strict_tables": true,
-    "identifier_rule": "Table and column identifiers are the type or field name, lowercased, with `-` replaced by `_`, and always double-quoted in the DDL. `fecha-creacion` becomes `fecha_creacion`. Quoting everything costs nothing and removes the whole class of reserved-word collisions.",
+    "identifier_rule": "Table and column identifiers are the type or field name, lowercased, with `-` replaced by `_`, and always double-quoted in the DDL. Since 2026-09-22 NO kernel field needs the substitution -- the five hyphenated names were renamed -- so for this contract the column name and the field name are now the same string. The rule stays because `cerebro/schema.json` lets a user declare their own types, and a user-declared `mi-campo` still has to reach SQL as something writable. Quoting everything costs nothing and removes the whole class of reserved-word collisions.",
     "null_rule": "A column is NOT NULL when its field is required AND its severity is not relaxed. A requirement carrying `severity: warning` is one the corpus is still migrating towards -- projecting it as NOT NULL would make the projector refuse documents that the validator merely warns about, which is a stricter rule than the contract's own. A `map` flattened into columns inherits its parent's requirement: `generated` is required but relaxed, so `generated_by` and `generated_at` are nullable -- otherwise the projector would refuse a document the contract accepts.",
     "synthetic_columns": {
       "note": "Columns the projector knows and that no document declares. They are deliberately NOT `common_fields`: that block is the contract of what someone WRITES, and a `path` written inside a document is a derived value stored by hand -- move the file and the field lies. A `hash` inside the content is worse, because writing it changes what it hashes. (`resumen_hash` of T2 is the legitimate case of the same shape: it hashes the BODY, not itself.)",
@@ -703,7 +703,7 @@
       "note_projected_at": "A `projected_at` column was declared in T4 and REMOVED in T5, before it ever shipped. It made two projections of identical content differ, which quietly breaks the acceptance criterion of T5 -- `--full` must be indistinguishable from an incremental pass. And it was redundant: what anyone actually asks is whether a row is up to date, and `hash` answers exactly that. A column that costs a real property and duplicates another one is not worth its bytes."
     },
     "timeline": {
-      "note": "The event view of T6 is built from EVERY field with `data_type: date`, by rule and never by listing names -- listing them by hand is how the first version silently dropped `Pregunta.fecha-creacion` and `Plan.ultima-revision`. A field that is a date but not an event opts out with `timeline: false` and says why in its own `note`. Decided 2026-09-13, when counting against the generated DDL showed six date fields where the plan claimed five.",
+      "note": "The event view of T6 is built from EVERY field with `data_type: date`, by rule and never by listing names -- listing them by hand is how the first version silently dropped `Pregunta.created` and `Plan.last_review`. A field that is a date but not an event opts out with `timeline: false` and says why in its own `note`. Decided 2026-09-13, when counting against the generated DDL showed six date fields where the plan claimed five.",
       "rule": "every field with data_type `date`, unless it declares `timeline: false`",
       "opted_out": ["Diagrama.version"],
       "view": "eventos",

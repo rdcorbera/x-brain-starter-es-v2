@@ -92,17 +92,17 @@
     "proyecto": {
       "type": "string"
     },
-    "fuente-de-verdad": {
+    "source_of_truth": {
       "type": "string",
       "enum": [
         "cerebro",
         "externa"
       ]
     },
-    "tracker-externo": {
+    "external_tracker": {
       "type": "string"
     },
-    "ultima-revision": {
+    "last_review": {
       "type": "string",
       "format": "date"
     }
@@ -118,7 +118,7 @@
     "resumen_hash",
     "procedencia",
     "proyecto",
-    "fuente-de-verdad",
-    "ultima-revision"
+    "source_of_truth",
+    "last_review"
   ]
 }

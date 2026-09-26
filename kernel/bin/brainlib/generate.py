@@ -255,11 +255,16 @@ def _json_schema_field(field: Dict[str, Any], contract: Contract) -> dict:
 def _sql_name(name: str) -> str:
     """El nombre de una columna o tabla. NO es el nombre del campo.
 
-    `fecha-creacion` es un campo válido y `fecha-creacion` no es un
-    identificador que se pueda escribir sin comillas en ninguna consulta, así
-    que la columna se llama `fecha_creacion`. Mantener los dos nombres
-    separados importa: el proyector inserta por nombre de COLUMNA y lee por
-    nombre de CAMPO, y confundirlos costó un `no such column` en T5.
+    Desde el 2026-09-22 ningún campo del kernel necesita la sustitución: los
+    cinco nombres con guion se renombraron, así que campo y columna vuelven a
+    ser la misma cadena. La función se queda porque `cerebro/schema.json` deja
+    declarar tipos propios, y un `mi-campo` de un usuario sigue teniendo que
+    llegar a SQL como algo escribible.
+
+    Mantener los dos nombres separados importa igual: el proyector inserta por
+    nombre de COLUMNA y lee por nombre de CAMPO, y confundirlos costó un
+    `no such column` en T5 — cuando `fecha-creacion` era el campo y
+    `fecha_creacion` la columna.
     """
     return name.lower().replace("-", "_")
 
@@ -606,7 +611,7 @@ def timeline_fields(contract: Contract) -> List[Tuple[str, str]]:
     """(tipo, campo) de todo lo que es un evento, por REGLA y nunca por nombre.
 
     Listar los nombres a mano fue el defecto original: `Pregunta` llama a su
-    fecha `fecha-creacion` y `Plan` `ultima-revision`, así que seleccionar por
+    fecha `created` y `Plan` `last_review`, así que seleccionar por
     el nombre `fecha` omitía dos de los cinco tipos **en silencio**. La regla
     mecánica los recoge solos, y un tipo nuevo con fecha entra sin tocar nada.
 

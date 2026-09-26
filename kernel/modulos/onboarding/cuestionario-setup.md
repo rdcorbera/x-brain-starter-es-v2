@@ -88,7 +88,7 @@ no había usado ni una vez.
 
 | Lo que v1 preguntaba | Por qué ya no |
 |---|---|
-| La tabla de personas | Las fichas las crea `/x-procesar-inbox` cuando alguien aparece en una fuente, y `ORGANIGRAMA.md` se genera solo desde `reporta-a` |
+| La tabla de personas | Las fichas las crea `/x-procesar-inbox` cuando alguien aparece en una fuente, y `ORGANIGRAMA.md` se genera solo desde `reports_to` |
 | Las áreas de conocimiento | Se acuerdan al elegir profile, o se crean cuando hace falta la primera |
 | Los tipos de documento propios | Pedía **diseñar una taxonomía** antes del primer uso. Ahora es `/x-crear-plantilla`, cuando el catálogo base se quede corto de verdad |
 | Los objetivos del periodo | Son documentos `Iniciativa`, y los crea `/x-nueva-iniciativa`. `GOALS.md` es un derivado: **no se escribe a mano** |

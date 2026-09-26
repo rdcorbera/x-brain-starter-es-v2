@@ -89,7 +89,7 @@
         "derivado"
       ]
     },
-    "dueño": {
+    "owner": {
       "type": "string"
     },
     "categoria": {
@@ -120,7 +120,7 @@
     "resumen",
     "resumen_hash",
     "procedencia",
-    "dueño",
+    "owner",
     "categoria",
     "estado"
   ]

@@ -124,15 +124,15 @@ CREATE TABLE "persona" (
   "doc" TEXT NOT NULL PRIMARY KEY REFERENCES "documentos"("path") ON DELETE CASCADE,
   "rol" TEXT NOT NULL,
   "equipo" TEXT,
-  "reporta_a" TEXT
+  "reports_to" TEXT
 ) STRICT;
 
 CREATE TABLE "plan" (
   "doc" TEXT NOT NULL PRIMARY KEY REFERENCES "documentos"("path") ON DELETE CASCADE,
   "proyecto" TEXT NOT NULL,
-  "fuente_de_verdad" TEXT NOT NULL CHECK ("fuente_de_verdad" IN ('cerebro', 'externa')),
-  "tracker_externo" TEXT,
-  "ultima_revision" TEXT NOT NULL
+  "source_of_truth" TEXT NOT NULL CHECK ("source_of_truth" IN ('cerebro', 'externa')),
+  "external_tracker" TEXT,
+  "last_review" TEXT NOT NULL
 ) STRICT;
 
 CREATE TABLE "playbook" (
@@ -146,7 +146,7 @@ CREATE TABLE "pregunta" (
   "estado" TEXT NOT NULL CHECK ("estado" IN ('abierta', 'en-progreso', 'respondida')),
   "responsable" TEXT,
   "bloqueante" INTEGER NOT NULL,
-  "fecha_creacion" TEXT NOT NULL,
+  "created" TEXT NOT NULL,
   "respondida_por" TEXT
 ) STRICT;
 
@@ -165,7 +165,7 @@ CREATE TABLE "reunion_asistentes" (
 
 CREATE TABLE "sistema" (
   "doc" TEXT NOT NULL PRIMARY KEY REFERENCES "documentos"("path") ON DELETE CASCADE,
-  "dueño" TEXT NOT NULL,
+  "owner" TEXT NOT NULL,
   "categoria" TEXT NOT NULL CHECK ("categoria" IN ('sistema', 'herramienta', 'producto', 'proceso')),
   "estado" TEXT NOT NULL CHECK ("estado" IN ('activo', 'en-cambio', 'deprecado'))
 ) STRICT;
@@ -208,12 +208,12 @@ CREATE VIEW "eventos" AS
          null as "proyecto"
     from "lineamiento" t join "documentos" d on d."path" = t."doc"
   union all
-  select t."ultima_revision" as "fecha", 'Plan' as "tipo", 'ultima-revision' as "campo",
+  select t."last_review" as "fecha", 'Plan' as "tipo", 'last_review' as "campo",
          d."path" as "doc", d."title" as "title",
          t."proyecto" as "proyecto"
     from "plan" t join "documentos" d on d."path" = t."doc"
   union all
-  select t."fecha_creacion" as "fecha", 'Pregunta' as "tipo", 'fecha-creacion' as "campo",
+  select t."created" as "fecha", 'Pregunta' as "tipo", 'created' as "campo",
          d."path" as "doc", d."title" as "title",
          t."proyecto" as "proyecto"
     from "pregunta" t join "documentos" d on d."path" = t."doc"

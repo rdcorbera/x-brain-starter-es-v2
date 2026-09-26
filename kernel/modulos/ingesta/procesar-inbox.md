@@ -184,7 +184,7 @@ Y lo que ningún comando hace:
 
 1. **Completar la columna «Destino en el cerebro»** de las filas nuevas del manifiesto, con
    enlaces a las páginas que salieron de cada fuente.
-2. **Actualizar `ultima-revision`** en el `PLAN.md` de cada proyecto tocado.
+2. **Actualizar `last_review`** en el `PLAN.md` de cada proyecto tocado.
 3. **Loguear**: en el `log.md` de cada proyecto tocado y en `cerebro/log.md`, bajo su
    `## AAAA-MM-DD`:
    `**Ingesta**: N fuentes procesadas — N páginas creadas, N actualizadas, N preguntas nuevas.`
@@ -207,7 +207,7 @@ decisión del usuario.
 | Qué | Quién lo hace en su lugar |
 |---|---|
 | Escribir los `index.md` de las carpetas tocadas | `./brain index` |
-| Regenerar `PREGUNTAS-ABIERTAS.md`, `GOALS.md` u `ORGANIGRAMA.md` | `./brain derive`. `ORGANIGRAMA.md` sale de `reporta-a`; basta con que las fichas lo lleven |
+| Regenerar `PREGUNTAS-ABIERTAS.md`, `GOALS.md` u `ORGANIGRAMA.md` | `./brain derive`. `ORGANIGRAMA.md` sale de `reports_to`; basta con que las fichas lo lleven |
 | Actualizar `cerebro/PENDIENTES.md` | Nadie: **no existe en v2**. Las tareas viven dentro del `PLAN.md` |
 | Decidir en qué carpeta va cada documento | `./brain place` |
 | Abrir un proyecto que no existe | `/x-nueva-iniciativa`, y solo si el usuario lo pide |

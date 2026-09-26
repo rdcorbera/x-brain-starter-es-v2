@@ -27,6 +27,14 @@ que faltaba.
 - **`Playbook` se escindió en dos:** un `Playbook` se **sigue** (proceso reutilizable), un
   `Analisis` se **consulta** (estudio archivado). El contrato de v1 lo decía sin querer — su
   descripción rezaba *«a reusable process, OR an archived analysis»*.
+- **Seis claves de campo pasan al inglés**, que es lo que la política de idioma pide para la
+  configuración: `fuente-de-verdad` → `source_of_truth`, `tracker-externo` → `external_tracker`,
+  `ultima-revision` → `last_review`, `fecha-creacion` → `created`, `reporta-a` → `reports_to` y
+  `dueño` → `owner`. Eran las que llevaban guion o eñe. El guion obligaba a mantener **dos nombres
+  por campo** —`fecha-creacion` el campo, `fecha_creacion` la columna—, y confundirlos ya había
+  costado un `no such column`; ahora campo y columna vuelven a ser la misma cadena. **Las demás
+  claves por tipo siguen en español** (`proyecto`, `periodo`, `estado`…): es una inconsistencia
+  conocida y declarada como tal en el contrato, no una excepción justificada.
 - **`Insumo.origen` pasa a llamarse `Insumo.original`.** En v1 la clave `origen` significaba dos
   cosas: en una `Iniciativa` es un enum —de dónde viene el encargo— y en un `Insumo` era el enlace
   al original inmutable de `raw/`. Declarar los campos por tipo hacía la colisión inofensiva para
@@ -61,13 +69,13 @@ aplicaba nada.
 
 - **Clasificación** en cuatro niveles con **mínimo por tipo**. La ausencia es un aviso mientras
   el corpus migra; **estar por debajo del mínimo es siempre un error**.
-- **Responsabilidad**: `dueño`, `responsable` y `fuente` aceptan enlace a ficha `Persona` —que
+- **Responsabilidad**: `owner`, `responsable` y `fuente` aceptan enlace a ficha `Persona` —que
   se verifica— o texto libre, que se tolera y se reporta. La propiedad se vuelve consultable de
   forma progresiva, en vez de tras un muro de errores.
 - **Confianza**: `generated` frente a `verified`, con prefijos de actor, hace que *«esto lo
   escribió un agente y nadie lo revisó»* sea una propiedad consultable.
 - **Aplicación**: pre-commit sobre lo que cambia, CI sobre el bundle completo. Un hook que
-  falle sobre 10.000 documentos heredados se desactiva el primer día.
+  falle sobre todo un corpus heredado se desactiva el primer día.
 
 ### Frontmatter que abre en el visor
 
@@ -209,8 +217,8 @@ fallar. Desaparecen el `.venv`, el `requirements.txt` y el re-exec.
   enlace a su documento. Reconstruir lo que pasó en una iniciativa deja de exigir abrir su
   carpeta entera.
 - **Se genera por regla, nunca por una lista de nombres**: entra todo campo con
-  `data_type: date`. Seleccionar por el nombre `fecha` habría omitido `Pregunta.fecha-creacion` y
-  `Plan.ultima-revision` **en silencio**, que es el defecto que esta regla vino a eliminar. Un
+  `data_type: date`. Seleccionar por el nombre `fecha` habría omitido `Pregunta.created` y
+  `Plan.last_review` **en silencio**, que es el defecto que esta regla vino a eliminar. Un
   tipo nuevo con fecha entra solo.
 - **Un campo que es fecha pero no es un evento se excluye declarándolo**, no con una excepción en
   el código: `Diagrama.version` lleva `timeline: false` y la razón escrita en su propio campo.

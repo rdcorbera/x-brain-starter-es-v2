@@ -8,7 +8,7 @@ Base de conocimiento personal de trabajo, mantenida por agentes de IA — para *
 
 ## Por qué una v2
 
-v1 está en producción y funciona. Su problema es de escala: **el consumo de tokens crece conforme crece el cerebro**. En un cerebro de más de 10.000 documentos, eso deja de ser una molestia y pasa a ser el techo del sistema.
+v1 está en producción y funciona. Su problema es de escala: **el consumo de tokens crece conforme crece el cerebro**. Llegado cierto tamaño eso deja de ser una molestia y pasa a ser el techo del sistema. El cerebro que medimos tiene **301 documentos**, y ya ahí los índices se regeneraban a mano con la mitad sin actualizar.
 
 La pendiente tiene dos componentes, con causas y remedios distintos:
 
@@ -77,7 +77,7 @@ La política que no se ejecuta no es un control. v1 tenía **más** reglas de go
 
 **Clasificación.** Cuatro niveles —`public`, `internal`, `confidential`, `restricted`— y un **mínimo por tipo**. `Persona` no puede bajar de `confidential` porque contiene dato personal, e `Insumo` tampoco porque es material externo cuyo contenido el sistema no controla. **Faltar la clasificación es un error, y estar por debajo del mínimo también.** Fueron avisos mientras hubo un corpus de v1 que migrar; v2 no es retrocompatible y esa migración no existe, así que no queda nada esperando.
 
-**Responsabilidad.** `dueño`, `responsable` y `fuente` son `person-ref`: aceptan un enlace a una ficha `Persona` —que se verifica— o un nombre en texto libre, que se tolera y se reporta hasta resolverse. Así la propiedad se vuelve consultable de forma progresiva en vez de tras un muro de errores.
+**Responsabilidad.** `owner`, `responsable` y `fuente` son `person-ref`: aceptan un enlace a una ficha `Persona` —que se verifica— o un nombre en texto libre, que se tolera y se reporta hasta resolverse. Así la propiedad se vuelve consultable de forma progresiva en vez de tras un muro de errores.
 
 **Confianza.** `generated` frente a `verified` con prefijos de actor hace que *"esto lo escribió un agente y nadie lo revisó"* sea una propiedad consultable, no una suposición.
 

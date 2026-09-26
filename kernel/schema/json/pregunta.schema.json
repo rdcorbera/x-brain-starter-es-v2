@@ -106,7 +106,7 @@
     "bloqueante": {
       "type": "boolean"
     },
-    "fecha-creacion": {
+    "created": {
       "type": "string",
       "format": "date"
     },
@@ -127,6 +127,6 @@
     "proyecto",
     "estado",
     "bloqueante",
-    "fecha-creacion"
+    "created"
   ]
 }

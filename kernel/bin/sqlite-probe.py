@@ -50,7 +50,7 @@ FEATURES = [
     ("json", "SELECT json_extract('{\"a\":1}','$.a')",
      "leer campos de lista/mapa del frontmatter", "degradado: normalizar a tablas"),
     ("cte_recursive", "WITH RECURSIVE t(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM t WHERE n<3) SELECT count(*) FROM t",
-     "recorrer el grafo reporta-a (organigrama)", "BLOQUEANTE para CQ-31"),
+     "recorrer el grafo reports_to (organigrama)", "BLOQUEANTE para CQ-31"),
     ("strict_tables", "CREATE TABLE s(a INT) STRICT",
      "proyección tipada: el motor rechaza el tipo malo", "degradado: validar en Python"),
     ("upsert", "CREATE TABLE u(a INT PRIMARY KEY, b INT); INSERT INTO u VALUES(1,1) ON CONFLICT(a) DO UPDATE SET b=2",

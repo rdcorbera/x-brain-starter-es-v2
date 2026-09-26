@@ -215,7 +215,7 @@ La política que no se ejecuta no es un control. Estas son ejecutables.
   **la ausencia de clasificación es un error**, igual que estar por debajo del mínimo. Fue un
   aviso mientras existió un corpus que migrar; desde que se decidió que v2 no es retrocompatible,
   no hay nada esperando: un documento entra en el cerebro con su nivel o no entra.
-- **Responsabilidad.** `dueño`, `responsable` y `fuente` aceptan un enlace a una ficha
+- **Responsabilidad.** `owner`, `responsable` y `fuente` aceptan un enlace a una ficha
   `Persona` —que se verifica— o un nombre en texto libre, que se tolera y se reporta hasta
   resolverse (V17).
 - **Vigencia.** *«¿Esto sigue valiendo?»* lo responde **una sola cosa**: el intervalo

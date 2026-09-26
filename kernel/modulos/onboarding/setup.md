@@ -144,7 +144,7 @@ setup es pedirle a alguien que describa un sistema que todavía no ha usado.
 
 | Qué | Quién lo crea | Cuándo |
 |---|---|---|
-| Fichas `Persona` y el organigrama | `/x-procesar-inbox`, al aparecer alguien en una fuente | `ORGANIGRAMA.md` se genera solo desde `reporta-a` |
+| Fichas `Persona` y el organigrama | `/x-procesar-inbox`, al aparecer alguien en una fuente | `ORGANIGRAMA.md` se genera solo desde `reports_to` |
 | Objetivos e iniciativas | `/x-nueva-iniciativa` | `GOALS.md` es un derivado de `Iniciativa.origen`; **no se escribe a mano** |
 | Tipos de documento propios | `/x-crear-plantilla` | Cuando el catálogo base se quede corto de verdad |
 | Lineamientos | `/x-decision` o a mano | Un lineamiento es un estándar real; **inventarlo sería fabricar** |

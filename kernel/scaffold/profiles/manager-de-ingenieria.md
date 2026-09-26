@@ -36,7 +36,7 @@ Lo que sale de mis manos:
 
 <!-- TODO: /x-setup — a cuánta gente lideras y qué roles tienen. Las personas NO
      se listan aquí: cada una es una ficha Persona en 02-areas/personas/, y el
-     organigrama se genera solo desde el campo `reporta-a`. Aquí va solo la forma
+     organigrama se genera solo desde el campo `reports_to`. Aquí va solo la forma
      del equipo, en una línea.
 
      Añade también qué te da energía y qué sientes como trámite, y el contexto

@@ -611,7 +611,7 @@ def check_projection(contract) -> List[str]:
             # Una fecha distinta por tipo: con todas iguales, la comprobación
             # del orden de la vista de eventos no distinguiría nada.
             dia = f"2026-{(len(body) % 12) + 1:02d}-{(len(type_name) % 28) + 1:02d}"
-            body = re.sub(r"(?m)^((?:fecha|fecha-creacion|ultima-revision): )\d{4}-\d{2}-\d{2}$",
+            body = re.sub(r"(?m)^((?:fecha|created|last_review): )\d{4}-\d{2}-\d{2}$",
                           lambda m: m.group(1) + dia, body)
             (bundle / f"caso-{type_name.lower()}.md").write_text(body, encoding="utf-8")
 
